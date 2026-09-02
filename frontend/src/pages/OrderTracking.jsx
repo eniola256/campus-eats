@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api, formatNaira } from '../api.js';
 
 const STEPS = ['payment_confirmed', 'accepted', 'shopping', 'out_for_delivery', 'delivered'];
@@ -9,6 +9,8 @@ const STEP_LABELS = {
   shopping: 'Shopping at the shop',
   out_for_delivery: 'Out for delivery',
   delivered: 'Delivered',
+  payment_failed: 'Payment failed',
+  pending_payment: 'Waiting for payment',
 };
 
 export default function OrderTracking() {
@@ -47,7 +49,8 @@ export default function OrderTracking() {
   if (!data) return <p className="state-msg">{verifying ? 'Confirming your payment…' : 'Loading your order…'}</p>;
 
   const { order, items } = data;
-  const currentStepIndex = order.status === 'cancelled' ? -1 : STEPS.indexOf(order.status);
+  const isTerminalProblem = order.status === 'cancelled' || order.status === 'payment_failed';
+  const currentStepIndex = isTerminalProblem ? -1 : STEPS.indexOf(order.status);
 
   return (
     <div className="tracking-page">
@@ -56,9 +59,22 @@ export default function OrderTracking() {
         <p className="ticket-eyebrow">Order #{order.id}</p>
         <h1>{STEP_LABELS[order.status] || order.status}</h1>
 
-        {order.status === 'cancelled' ? (
+        {order.status === 'cancelled' && (
           <p className="state-msg error">This order was cancelled.</p>
-        ) : (
+        )}
+
+        {order.status === 'payment_failed' && (
+          <>
+            <p className="state-msg error">
+              Your payment didn't go through. No charge was made — your items are still saved below.
+            </p>
+            <Link to="/checkout" className="btn-primary" style={{ display: 'inline-block', textDecoration: 'none', marginBottom: '1rem' }}>
+              Try payment again
+            </Link>
+          </>
+        )}
+
+        {!isTerminalProblem && order.status !== 'pending_payment' && (
           <ol className="progress-trail">
             {STEPS.map((step, i) => (
               <li key={step} className={i <= currentStepIndex ? 'done' : ''}>

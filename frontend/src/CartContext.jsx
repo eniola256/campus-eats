@@ -1,9 +1,23 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useMemo, useState, useEffect } from 'react';
 
 const CartContext = createContext(null);
+const STORAGE_KEY = 'ce_cart';
+
+function loadInitialCart() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
 
 export function CartProvider({ children }) {
-  const [items, setItems] = useState([]); // [{product, quantity}]
+  const [items, setItems] = useState(loadInitialCart);
+
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  }, [items]);
 
   function addItem(product) {
     setItems((prev) => {
