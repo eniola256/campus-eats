@@ -68,24 +68,25 @@ async function confirmPaymentByReference(reference, rawPayload) {
 router.get('/verify/:reference', async (req, res, next) => {
   try {
     const result = await verifyTransaction(req.params.reference);
+    console.log(`Verify check for ${req.params.reference}: paymentStatus=${result?.paymentStatus}`);
     if (result?.paymentStatus !== 'PAID') {
-      await pool.query(
+      const updateResult = await pool.query(
         `UPDATE orders SET status = 'payment_failed', updated_at = now()
-         WHERE paystack_reference = $1 AND status = 'pending_payment'`,
+         WHERE paystack_reference = $1 AND status = 'pending_payment'
+         RETURNING id`,
         [req.params.reference]
       );
+      console.log(`Marked payment_failed for ${req.params.reference}, rows updated: ${updateResult.rowCount}`);
       return res.status(400).json({ ok: false, status: result?.paymentStatus });
     }
     const outcome = await confirmPaymentByReference(req.params.reference, result);
     res.json(outcome);
   } catch (err) {
+    console.error(`Verify check FAILED for ${req.params.reference}:`, err.message || err);
     next(err);
   }
 });
 
-// The webhook body is only used to find WHICH reference to check — never
-// to decide success/failure. That decision always comes from an
-// independent verifyTransaction() call to Monnify's own API below.
 router.post('/webhook', async (req, res) => {
   try {
     const signature = req.headers['monnify-signature'];
