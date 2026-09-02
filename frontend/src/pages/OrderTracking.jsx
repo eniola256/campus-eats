@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api, formatNaira } from '../api.js';
+import { useCart } from '../CartContext.jsx';
 
 const STEPS = ['payment_confirmed', 'accepted', 'shopping', 'out_for_delivery', 'delivered'];
+const PAID_STATUSES = new Set(STEPS); // any status past pending_payment means payment succeeded
 const STEP_LABELS = {
   payment_confirmed: 'Payment confirmed',
   accepted: 'Order accepted',
@@ -14,6 +16,7 @@ const STEP_LABELS = {
 };
 
 export default function OrderTracking() {
+  const { clearCart } = useCart();
   const { id, phone: phoneFromPath } = useParams();
   const [searchParams] = useSearchParams();
   const phone = phoneFromPath || searchParams.get('phone');
@@ -44,6 +47,15 @@ export default function OrderTracking() {
     }, 8000);
     return () => clearInterval(interval);
   }, [id, phone, reference]);
+
+  useEffect(() => {
+    // Clear the cart once we can see payment actually succeeded — not
+    // before, so a failed/pending payment still leaves items in place
+    // for the "Try payment again" flow to work with.
+    if (data && PAID_STATUSES.has(data.order.status)) {
+      clearCart();
+    }
+  }, [data]);
 
   if (error) return <p className="state-msg error">{error}</p>;
   if (!data) return <p className="state-msg">{verifying ? 'Confirming your payment…' : 'Loading your order…'}</p>;
