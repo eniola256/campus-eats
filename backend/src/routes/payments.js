@@ -65,18 +65,15 @@ async function confirmPaymentByReference(reference, rawPayload) {
   }
 }
 
-// GET /api/payments/verify/:reference — convenience check after Monnify
-// redirects the customer back. The webhook is still the real source of
-// truth in case the browser closes before this fires.
-//
-// NOTE: 'PAID' is Monnify's success value based on best understanding of
-// their docs — confirm this exact string against one real sandbox response
-// before relying on it in production (temporarily log the raw `result`
-// here to check).
 router.get('/verify/:reference', async (req, res, next) => {
   try {
     const result = await verifyTransaction(req.params.reference);
     if (result?.paymentStatus !== 'PAID') {
+      await pool.query(
+        `UPDATE orders SET status = 'payment_failed', updated_at = now()
+         WHERE paystack_reference = $1 AND status = 'pending_payment'`,
+        [req.params.reference]
+      );
       return res.status(400).json({ ok: false, status: result?.paymentStatus });
     }
     const outcome = await confirmPaymentByReference(req.params.reference, result);
@@ -86,14 +83,9 @@ router.get('/verify/:reference', async (req, res, next) => {
   }
 });
 
-// POST /api/payments/webhook — Monnify server-to-server event notification.
-//
-// CAVEAT: Monnify only sends the 'monnify-signature' header in PRODUCTION,
-// not sandbox — so this signature check can't be exercised in testing the
-// way Paystack's test cards let us. Also unconfirmed: exact webhook payload
-// field names (eventType / eventData.paymentReference is best
-// understanding) — log the raw payload once a real webhook arrives and
-// adjust if needed.
+// The webhook body is only used to find WHICH reference to check — never
+// to decide success/failure. That decision always comes from an
+// independent verifyTransaction() call to Monnify's own API below.
 router.post('/webhook', async (req, res) => {
   try {
     const signature = req.headers['monnify-signature'];
@@ -103,10 +95,20 @@ router.post('/webhook', async (req, res) => {
     }
 
     const event = JSON.parse(req.body.toString('utf8'));
-    console.log('Monnify webhook received:', JSON.stringify(event)); // temporary — remove once field names are confirmed
+    console.log('Monnify webhook received:', JSON.stringify(event));
 
-    if (event.eventType === 'SUCCESSFUL_TRANSACTION') {
-      await confirmPaymentByReference(event.eventData.paymentReference, event.eventData);
+    const reference = event?.eventData?.paymentReference;
+    if (reference) {
+      const verified = await verifyTransaction(reference);
+      if (verified?.paymentStatus === 'PAID') {
+        await confirmPaymentByReference(reference, verified);
+      } else {
+        await pool.query(
+          `UPDATE orders SET status = 'payment_failed', updated_at = now()
+           WHERE paystack_reference = $1 AND status = 'pending_payment'`,
+          [reference]
+        );
+      }
     }
 
     res.sendStatus(200);
