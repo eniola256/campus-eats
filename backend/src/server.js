@@ -10,6 +10,7 @@ const paymentsRouter = require('./routes/payments');
 const adminRouter = require('./routes/admin');
 
 const app = express();
+app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
