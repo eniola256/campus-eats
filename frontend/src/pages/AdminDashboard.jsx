@@ -16,6 +16,11 @@ const NEXT_LABEL = {
 };
 const ACTIVE_STATUSES = ['payment_confirmed', 'accepted', 'shopping', 'out_for_delivery'];
 
+function minutesAgo(isoString) {
+  const diffMs = Date.now() - new Date(isoString).getTime();
+  return Math.max(0, Math.floor(diffMs / 60000));
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const token = sessionStorage.getItem('ce_admin_token');
@@ -52,10 +57,20 @@ export default function AdminDashboard() {
     if (selected?.order.id === order.id) openOrder(order.id);
   }
 
+  async function contactCustomer(itemId, orderId) {
+    await api.adminContactCustomer(token, itemId);
+    openOrder(orderId);
+  }
+
   async function markUnavailable(itemId, orderId) {
     await api.adminMarkUnavailable(token, itemId);
     openOrder(orderId);
     refresh();
+  }
+
+  async function markRefunded(refundId, orderId) {
+    await api.adminMarkRefunded(token, refundId);
+    openOrder(orderId);
   }
 
   function logout() {
@@ -94,15 +109,28 @@ export default function AdminDashboard() {
 
             <ul className="ticket-items">
               {selected.items.map((item) => (
-                <li key={item.id} className={item.status !== 'ok' ? 'struck' : ''}>
+                <li key={item.id} className={item.status !== 'ok' ? 'struck' : ''} style={{ flexWrap: 'wrap' }}>
                   <span>{item.quantity}× {item.product_name}</span>
                   <span>{formatNaira(item.line_total_kobo)}</span>
-                  {item.status === 'ok' && (
-                    <button className="btn-link" onClick={() => markUnavailable(item.id, selected.order.id)}>
-                      mark unavailable
+
+                  {item.status === 'ok' && !item.contact_attempted_at && (
+                    <button className="btn-link" onClick={() => contactCustomer(item.id, selected.order.id)}>
+                      contact customer
                     </button>
                   )}
-                  {item.status === 'unavailable' && <span className="tag">refunded</span>}
+
+                  {item.status === 'ok' && item.contact_attempted_at && (
+                    <>
+                      <span className="note" style={{ marginTop: 0 }}>
+                        contacted {minutesAgo(item.contact_attempted_at)}m ago
+                      </span>
+                      <button className="btn-link" onClick={() => markUnavailable(item.id, selected.order.id)}>
+                        confirm unavailable &amp; refund
+                      </button>
+                    </>
+                  )}
+
+                  {item.status === 'unavailable' && <span className="tag">unavailable</span>}
                 </li>
               ))}
             </ul>
@@ -112,8 +140,28 @@ export default function AdminDashboard() {
               <span>{formatNaira(selected.order.total_kobo)}</span>
             </div>
 
+            {selected.refunds && selected.refunds.length > 0 && (
+              <div style={{ marginTop: '1rem' }}>
+                <h3 style={{ fontSize: '0.9rem' }}>Refunds owed</h3>
+                <ul className="ticket-items">
+                  {selected.refunds.map((r) => (
+                    <li key={r.id}>
+                      <span>{formatNaira(r.amount_kobo)} — {r.reason.replace(/_/g, ' ')}</span>
+                      {r.status === 'pending' ? (
+                        <button className="btn-link" onClick={() => markRefunded(r.id, selected.order.id)}>
+                          mark refunded
+                        </button>
+                      ) : (
+                        <span className="tag" style={{ background: '#2b6e63' }}>refunded</span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {NEXT_STATUS[selected.order.status] && (
-              <button className="btn-primary" onClick={() => advance(selected.order)}>
+              <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={() => advance(selected.order)}>
                 {NEXT_LABEL[selected.order.status]}
               </button>
             )}

@@ -26,8 +26,18 @@ export const api = {
     request(`/admin/orders/${id}/status`, {
       method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }),
     }),
+  adminContactCustomer: (token, itemId) =>
+    request(`/admin/order-items/${itemId}/contact`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}` },
+    }),
   adminMarkUnavailable: (token, itemId) =>
     request(`/admin/order-items/${itemId}/unavailable`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}` },
+    }),
+  adminGetRefunds: (token, status) =>
+    request(`/admin/refunds${status ? `?status=${status}` : ''}`, { headers: { Authorization: `Bearer ${token}` } }),
+  adminMarkRefunded: (token, refundId) =>
+    request(`/admin/refunds/${refundId}/mark-refunded`, {
       method: 'PATCH', headers: { Authorization: `Bearer ${token}` },
     }),
   adminGetProducts: (token) =>

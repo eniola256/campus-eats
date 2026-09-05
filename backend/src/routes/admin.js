@@ -4,7 +4,6 @@ const jwt = require('jsonwebtoken');
 const pool = require('../db/pool');
 const { requireAdmin } = require('../middleware/auth');
 const { notify } = require('../services/whatsapp');
-const { refundTransaction } = require('../services/monnify');
 
 const router = express.Router();
 
@@ -15,7 +14,6 @@ const VALID_TRANSITIONS = {
   out_for_delivery: ['delivered'],
 };
 
-// POST /api/admin/login
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -37,7 +35,6 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-// GET /api/admin/orders?status=payment_confirmed — dashboard order list
 router.get('/orders', requireAdmin, async (req, res, next) => {
   try {
     const { status } = req.query;
@@ -54,7 +51,6 @@ router.get('/orders', requireAdmin, async (req, res, next) => {
   }
 });
 
-// GET /api/admin/orders/:id — full order detail incl. items
 router.get('/orders/:id', requireAdmin, async (req, res, next) => {
   try {
     const { rows: orderRows } = await pool.query(
@@ -67,13 +63,34 @@ router.get('/orders/:id', requireAdmin, async (req, res, next) => {
       `SELECT * FROM order_items WHERE order_id = $1`,
       [req.params.id]
     );
-    res.json({ order: orderRows[0], items });
+    const { rows: refunds } = await pool.query(
+      `SELECT * FROM refunds WHERE order_id = $1 ORDER BY created_at DESC`,
+      [req.params.id]
+    );
+    res.json({ order: orderRows[0], items, refunds });
   } catch (err) {
     next(err);
   }
 });
 
-// PATCH /api/admin/orders/:id/status  { status: 'accepted' }
+router.get('/refunds', requireAdmin, async (req, res, next) => {
+  try {
+    const { status } = req.query;
+    const { rows } = await pool.query(
+      `SELECT r.*, o.id AS order_number, c.full_name, c.phone
+       FROM refunds r
+       JOIN orders o ON o.id = r.order_id
+       JOIN customers c ON c.id = o.customer_id
+       WHERE ($1::text IS NULL OR r.status = $1)
+       ORDER BY r.created_at DESC LIMIT 200`,
+      [status || null]
+    );
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch('/orders/:id/status', requireAdmin, async (req, res, next) => {
   const client = await pool.connect();
   try {
@@ -119,14 +136,39 @@ router.patch('/orders/:id/status', requireAdmin, async (req, res, next) => {
   }
 });
 
-// PATCH /api/admin/order-items/:id/unavailable — mark one item unavailable,
-// record a refund, notify the customer, and shrink the order total.
+router.patch('/order-items/:id/contact', requireAdmin, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT oi.*, o.id AS order_id, c.phone
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+       JOIN customers c ON c.id = o.customer_id
+       WHERE oi.id = $1`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Item not found' });
+    const item = rows[0];
+    if (item.status !== 'ok') return res.status(400).json({ error: 'Item already handled' });
+
+    await pool.query(`UPDATE order_items SET contact_attempted_at = now() WHERE id = $1`, [item.id]);
+
+    await notify('contacting_customer', item.phone, {
+      orderId: item.order_id,
+      itemName: item.product_name,
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.patch('/order-items/:id/unavailable', requireAdmin, async (req, res, next) => {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `SELECT oi.*, o.paystack_reference, o.id AS order_id, c.phone
+      `SELECT oi.*, o.id AS order_id, c.phone
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
        JOIN customers c ON c.id = o.customer_id
@@ -149,21 +191,12 @@ router.patch('/order-items/:id/unavailable', requireAdmin, async (req, res, next
        WHERE id = $2`,
       [item.line_total_kobo, item.order_id]
     );
-    const refundResult = await client.query(
+    await client.query(
       `INSERT INTO refunds (order_id, order_item_id, amount_kobo, reason, status, processed_by)
-       VALUES ($1, $2, $3, 'item_unavailable', 'pending', $4) RETURNING id`,
+       VALUES ($1, $2, $3, 'item_unavailable', 'pending', $4)`,
       [item.order_id, item.id, item.line_total_kobo, req.admin.id]
     );
     await client.query('COMMIT');
-
-    // Attempt the actual Paystack refund; record outcome but don't block
-    // the response on it — refunds can take a moment on Paystack's side.
-    try {
-      await refundTransaction({ reference: item.paystack_reference, amountKobo: item.line_total_kobo });
-      await pool.query(`UPDATE refunds SET status = 'processed' WHERE id = $1`, [refundResult.rows[0].id]);
-    } catch (refundErr) {
-      console.error('Paystack refund failed, left as pending for manual follow-up:', refundErr);
-    }
 
     await notify('item_unavailable', item.phone, {
       orderId: item.order_id,
@@ -180,7 +213,35 @@ router.patch('/order-items/:id/unavailable', requireAdmin, async (req, res, next
   }
 });
 
-// --- Product & fee management ---
+router.patch('/refunds/:id/mark-refunded', requireAdmin, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT r.*, o.id AS order_id, c.phone
+       FROM refunds r
+       JOIN orders o ON o.id = r.order_id
+       JOIN customers c ON c.id = o.customer_id
+       WHERE r.id = $1`,
+      [req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Refund not found' });
+    const refund = rows[0];
+    if (refund.status === 'processed') return res.status(400).json({ error: 'Already marked refunded' });
+
+    await pool.query(
+      `UPDATE refunds SET status = 'processed', processed_by = $1, processed_at = now() WHERE id = $2`,
+      [req.admin.id, refund.id]
+    );
+
+    await notify('refund_issued', refund.phone, {
+      orderId: refund.order_id,
+      amount: (refund.amount_kobo / 100).toLocaleString(),
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/products', requireAdmin, async (req, res, next) => {
   try {
@@ -227,8 +288,6 @@ router.patch('/products/:id', requireAdmin, async (req, res, next) => {
   }
 });
 
-// PATCH /api/admin/fees/pause — pause/resume ordering by toggling every
-// product's availability at once (simple V1 approach).
 router.patch('/ordering/:action(pause|resume)', requireAdmin, async (req, res, next) => {
   try {
     const makeAvailable = req.params.action === 'resume';
