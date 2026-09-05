@@ -36,10 +36,6 @@ function monnifyRequest(method, path, body, token) {
   });
 }
 
-// Monnify uses a Bearer token, not a static secret key like Paystack —
-// obtained by Base64-encoding apiKey:secretKey and posting to /auth/login.
-// Tokens expire after ~1 hour, so we cache it and only fetch a new one
-// once it's actually expired (with a small safety buffer).
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
@@ -47,7 +43,6 @@ async function getAccessToken() {
   if (cachedToken && Date.now() < tokenExpiresAt) {
     return cachedToken;
   }
-
   const credentials = Buffer.from(`${MONNIFY_API_KEY}:${MONNIFY_SECRET_KEY}`).toString('base64');
 
   const response = await new Promise((resolve, reject) => {
@@ -77,19 +72,11 @@ async function getAccessToken() {
   if (!response.requestSuccessful) {
     throw new Error(`Monnify auth failed: ${response.responseMessage || 'unknown error'}`);
   }
-
   cachedToken = response.responseBody.accessToken;
-  // expiresIn is in seconds — refresh a minute early to avoid edge-case
-  // failures right as a token expires mid-request.
   tokenExpiresAt = Date.now() + (response.responseBody.expiresIn - 60) * 1000;
-
   return cachedToken;
 }
 
-// Same call shape as paystack.js's initializeTransaction, so payments.js
-// (or wherever this gets called) barely needs to change. amountKobo comes
-// in as kobo (matching our schema), converted to naira here since that's
-// what Monnify's API expects.
 async function initializeTransaction({ email, name, amountKobo, reference, redirectUrl }) {
   const token = await getAccessToken();
   const amountNaira = amountKobo / 100;
@@ -109,23 +96,12 @@ async function initializeTransaction({ email, name, amountKobo, reference, redir
     },
     token
   );
-
   if (!response.requestSuccessful) {
     throw new Error(`Monnify initialize failed: ${response.responseMessage}`);
   }
-
-  return response.responseBody; // includes checkoutUrl, transactionReference
+  return response.responseBody;
 }
 
-// Verify by OUR paymentReference (the one we generated) — always re-check
-// server-side, same principle as Paystack: never trust the redirect alone.
-//
-// NOTE: exact endpoint path below is my best-confirmed understanding from
-// Monnify's docs, but their code samples didn't fully render for me to
-// copy verbatim — please confirm this against the sample code shown in
-// YOUR Monnify dashboard once you have real sandbox credentials, before
-// relying on it. Everything else here (auth flow, response fields,
-// webhook signature) I was able to confirm directly.
 async function verifyTransaction(paymentReference) {
   const token = await getAccessToken();
   const response = await monnifyRequest(
@@ -134,26 +110,41 @@ async function verifyTransaction(paymentReference) {
     null,
     token
   );
-
   if (!response.requestSuccessful) {
     throw new Error(`Monnify verify failed: ${response.responseMessage}`);
   }
-
-  return response.responseBody; // includes paymentStatus, amountPaid (in naira)
+  return response.responseBody;
 }
 
-// Verifies a webhook genuinely came from Monnify. Per Monnify's docs, this
-// signature header is ONLY sent in production, not sandbox — meaning we
-// can't fully test this specific check until going live. Worth building
-// it correctly now regardless, and testing the rest of the webhook flow
-// via the verify-on-redirect path in the meantime.
 function isValidWebhookSignature(rawBody, signatureHeader) {
   if (!signatureHeader) return false;
-  const hash = crypto
-    .createHmac('sha512', MONNIFY_SECRET_KEY)
-    .update(rawBody)
-    .digest('hex');
+  const hash = crypto.createHmac('sha512', MONNIFY_SECRET_KEY).update(rawBody).digest('hex');
   return hash === signatureHeader;
 }
 
-module.exports = { initializeTransaction, verifyTransaction, isValidWebhookSignature };
+// NOTE: endpoint path is my best-confirmed understanding of Monnify's
+// refund API, following the same shape as their other transaction
+// endpoints — but I could not verify this against live docs. Test this
+// against one real sandbox transaction and check the response shape
+// before trusting it in the admin "mark unavailable" flow.
+async function refundTransaction({ reference, amountKobo, customerNote }) {
+  const token = await getAccessToken();
+  const amountNaira = amountKobo / 100;
+  const response = await monnifyRequest(
+    'POST',
+    '/api/v1/refunds/initiate-refund',
+    {
+      transactionReference: reference,
+      refundReason: customerNote || 'Item unavailable',
+      refundAmount: amountNaira,
+      customerNote: customerNote || 'Item unavailable',
+    },
+    token
+  );
+  if (!response.requestSuccessful) {
+    throw new Error(`Monnify refund failed: ${response.responseMessage}`);
+  }
+  return response.responseBody;
+}
+
+module.exports = { initializeTransaction, verifyTransaction, isValidWebhookSignature, refundTransaction };
