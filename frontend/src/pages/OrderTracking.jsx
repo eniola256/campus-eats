@@ -60,6 +60,7 @@ export default function OrderTracking() {
   const { order, items } = data;
   const isTerminalProblem = order.status === 'cancelled' || order.status === 'payment_failed';
   const currentStepIndex = isTerminalProblem ? -1 : STEPS.indexOf(order.status);
+  const telegramLinkStyle = { color: '#2b6e63', fontWeight: 700 };
 
   return (
     <div className="tracking-page">
@@ -101,7 +102,7 @@ export default function OrderTracking() {
               href={`https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME}?start=${encodeURIComponent(phone)}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={{ color: 'var(--teal)', fontWeight: 700 }}
+              style={telegramLinkStyle}
             <a>
               Get order updates on Telegram →
             </a>

@@ -11,7 +11,7 @@ async function confirmPaymentByReference(reference, rawPayload) {
     await client.query('BEGIN');
 
     const { rows: orderRows } = await client.query(
-      `SELECT o.id, o.status, o.total_kobo, o.delivery_hostel, c.full_name, c.phonec.telegram_chat_id
+      `SELECT o.id, o.status, o.total_kobo, o.delivery_hostel, c.full_name, c.phone, c.telegram_chat_id
        FROM orders o JOIN customers c ON c.id = o.customer_id
        WHERE o.paystack_reference = $1
        FOR UPDATE`,
