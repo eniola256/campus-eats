@@ -4,7 +4,7 @@ import { api, formatNaira } from '../api.js';
 import { useCart } from '../CartContext.jsx';
 
 const STEPS = ['payment_confirmed', 'accepted', 'shopping', 'out_for_delivery', 'delivered'];
-const PAID_STATUSES = new Set(STEPS);
+const PAID_STATUSES = new Set(STEPS); // any status past pending_payment means payment succeeded
 const STEP_LABELS = {
   payment_confirmed: 'Payment confirmed',
   accepted: 'Order accepted',
@@ -30,6 +30,9 @@ export default function OrderTracking() {
     async function load() {
       try {
         if (reference) {
+          // Previously this result was silently discarded — now we let a
+          // failure flow through into `data` (via the order status the
+          // backend just recorded) so the customer actually sees it.
           await api.verifyPayment(reference).catch(() => null);
           setVerifying(false);
         }
@@ -49,6 +52,9 @@ export default function OrderTracking() {
   }, [id, phone, reference]);
 
   useEffect(() => {
+    // Clear the cart once we can see payment actually succeeded — not
+    // before, so a failed/pending payment still leaves items in place
+    // for the "Try payment again" flow to work with.
     if (data && PAID_STATUSES.has(data.order.status)) {
       clearCart();
     }
@@ -60,7 +66,6 @@ export default function OrderTracking() {
   const { order, items } = data;
   const isTerminalProblem = order.status === 'cancelled' || order.status === 'payment_failed';
   const currentStepIndex = isTerminalProblem ? -1 : STEPS.indexOf(order.status);
-  const telegramLinkStyle = { color: '#2b6e63', fontWeight: 700 };
 
   return (
     <div className="tracking-page">
@@ -98,12 +103,12 @@ export default function OrderTracking() {
 
         {!order.telegram_chat_id ? (
           <p className="ticket-meta">
-            
+            <a
               href={`https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME}?start=${encodeURIComponent(phone)}`}
               target="_blank"
               rel="noopener noreferrer"
-              style={telegramLinkStyle}
-            <a>
+              style={{ color: 'var(--teal)', fontWeight: 700 }}
+            >
               Get order updates on Telegram →
             </a>
           </p>
