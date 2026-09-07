@@ -122,7 +122,7 @@ router.get('/:id', async (req, res, next) => {
     if (!phone) return res.status(400).json({ error: 'phone query param required' });
 
     const { rows: orderRows } = await pool.query(
-      `SELECT o.*, c.full_name, c.phone FROM orders o
+      `SELECT o.*, c.full_name, c.phone, c.telegram_chat_id FROM orders o
        JOIN customers c ON c.id = o.customer_id
        WHERE o.id = $1 AND c.phone = $2`,
       [req.params.id, phone]

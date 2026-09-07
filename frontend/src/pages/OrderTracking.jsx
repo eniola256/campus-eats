@@ -4,7 +4,7 @@ import { api, formatNaira } from '../api.js';
 import { useCart } from '../CartContext.jsx';
 
 const STEPS = ['payment_confirmed', 'accepted', 'shopping', 'out_for_delivery', 'delivered'];
-const PAID_STATUSES = new Set(STEPS); // any status past pending_payment means payment succeeded
+const PAID_STATUSES = new Set(STEPS);
 const STEP_LABELS = {
   payment_confirmed: 'Payment confirmed',
   accepted: 'Order accepted',
@@ -49,9 +49,6 @@ export default function OrderTracking() {
   }, [id, phone, reference]);
 
   useEffect(() => {
-    // Clear the cart once we can see payment actually succeeded — not
-    // before, so a failed/pending payment still leaves items in place
-    // for the "Try payment again" flow to work with.
     if (data && PAID_STATUSES.has(data.order.status)) {
       clearCart();
     }
@@ -94,6 +91,23 @@ export default function OrderTracking() {
               </li>
             ))}
           </ol>
+        )}
+
+        <div className="ticket-divider" />
+
+        {!order.telegram_chat_id ? (
+          <p className="ticket-meta">
+            
+              href={`https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME}?start=${encodeURIComponent(phone)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: 'var(--teal)', fontWeight: 700 }}
+            <a>
+              Get order updates on Telegram →
+            </a>
+          </p>
+        ) : (
+          <p className="ticket-meta">✓ Connected for Telegram updates</p>
         )}
 
         <div className="ticket-divider" />

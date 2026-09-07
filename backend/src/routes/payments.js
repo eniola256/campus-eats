@@ -1,7 +1,7 @@
 const express = require('express');
 const pool = require('../db/pool');
 const { verifyTransaction, isValidWebhookSignature } = require('../services/monnify');
-const { notify } = require('../services/whatsapp');
+const { notify } = require('../services/telegram');
 
 const router = express.Router();
 
@@ -11,7 +11,7 @@ async function confirmPaymentByReference(reference, rawPayload) {
     await client.query('BEGIN');
 
     const { rows: orderRows } = await client.query(
-      `SELECT o.id, o.status, o.total_kobo, o.delivery_hostel, c.full_name, c.phone
+      `SELECT o.id, o.status, o.total_kobo, o.delivery_hostel, c.full_name, c.phonec.telegram_chat_id
        FROM orders o JOIN customers c ON c.id = o.customer_id
        WHERE o.paystack_reference = $1
        FOR UPDATE`,
@@ -51,7 +51,7 @@ async function confirmPaymentByReference(reference, rawPayload) {
 
     await client.query('COMMIT');
 
-    await notify('payment_confirmed', order.phone, {
+    await notify('payment_confirmed', order.telegram_chat_id, {
       orderId: order.id,
       total: (order.total_kobo / 100).toLocaleString(),
     });
