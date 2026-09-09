@@ -15,7 +15,13 @@ export const api = {
   createOrder: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload) }),
   getOrder: (id, phone) => request(`/orders/${id}?phone=${encodeURIComponent(phone)}`),
   verifyPayment: (reference) => request(`/payments/verify/${reference}`),
-
+  authStart: (phone) =>
+  request('/auth/start', { method: 'POST', body: JSON.stringify({ phone }) }),
+authStatus: (loginToken) => request(`/auth/status/${loginToken}`),
+authMe: (sessionToken) =>
+  request('/auth/me', { headers: { Authorization: `Bearer ${sessionToken}` } }),
+authLogout: (sessionToken) =>
+  request('/auth/logout', { method: 'DELETE', headers: { Authorization: `Bearer ${sessionToken}` } }),
   adminLogin: (email, password) =>
     request('/admin/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   adminGetOrders: (token, status) =>

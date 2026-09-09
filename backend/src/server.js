@@ -9,6 +9,7 @@ const ordersRouter = require('./routes/orders');
 const paymentsRouter = require('./routes/payments');
 const adminRouter = require('./routes/admin');
 const telegramRouter = require('./routes/telegram');
+const authRouter = require('./routes/auth');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -32,6 +33,8 @@ app.use('/api/orders', orderLimiter, ordersRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/telegram', telegramRouter);
+app.use('/api/auth', authRouter);
+
 
 // Central error handler — keeps stack traces out of responses.
 app.use((err, req, res, next) => {

@@ -104,7 +104,7 @@ export default function OrderTracking() {
         {!order.telegram_chat_id ? (
           <p className="ticket-meta">
             <a
-              href={`https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME}?start=${encodeURIComponent(phone)}`}
+              href={`https://t.me/${import.meta.env.VITE_TELEGRAM_BOT_USERNAME}?start=connect_${encodeURIComponent(phone)}`}
               target="_blank"
               rel="noopener noreferrer"
               style={{ color: 'var(--teal)', fontWeight: 700 }}
