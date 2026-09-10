@@ -1,73 +1,88 @@
-const https = require('https');
+const express = require('express');
+const crypto = require('crypto');
+const pool = require('../db/pool');
+const { sendTelegramMessage, TEMPLATES } = require('../services/telegram');
 
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const router = express.Router();
 
-const TEMPLATES = {
-  order_confirmed: (o) => `Hi ${o.name}, your Campus Eats order #${o.orderId} has been received. We'll ping you again once it's confirmed.`,
-  payment_confirmed: (o) => `Payment received for order #${o.orderId} (₦${o.total}). We're getting it ready!`,
-  contacting_customer: (o) => `Hi, we're trying to reach you about order #${o.orderId} — "${o.itemName}" isn't available at the shop right now. Reply here or expect a call shortly to sort out a substitute or refund.`,
-  item_unavailable: (o) => `Heads up: "${o.itemName}" wasn't available at the shop for order #${o.orderId}. You'll be refunded ₦${o.amount} for that item shortly. The rest of your order is still on the way.`,
-  refund_issued: (o) => `A refund of ₦${o.amount} has been sent for order #${o.orderId}.`,
-  out_for_delivery: (o) => `Your order #${o.orderId} is on its way to ${o.hostel}!`,
-  order_arrived: (o) => `We're outside! Please come out to collect order #${o.orderId} at ${o.hostel}.`,
-  order_delivered: (o) => `Order #${o.orderId} delivered. Enjoy your food! Reply if anything was off.`,
-  telegram_connected: () => `You're connected! Order updates for Campus Eats will show up right here from now on.`,
-};
-
-function sendTelegramMessage(chatId, text) {
-  return new Promise((resolve, reject) => {
-    const payload = JSON.stringify({ chat_id: chatId, text });
-    const req = https.request(
-      {
-        hostname: 'api.telegram.org',
-        path: `/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload),
-        },
-      },
-      (res) => {
-        let raw = '';
-        res.on('data', (c) => (raw += c));
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(raw));
-          } catch (e) {
-            resolve({ raw });
-          }
-        });
-      }
-    );
-    req.on('error', reject);
-    req.write(payload);
-    req.end();
-  });
-}
-
-async function notify(template, chatId, data) {
-  const build = TEMPLATES[template];
-  if (!build) {
-    console.error(`Unknown Telegram template: ${template}`);
-    return { skipped: true };
-  }
-  const body = build(data);
-
-  if (!chatId) {
-    console.log(`[telegram:not-connected] template=${template} body="${body}"`);
-    return { skipped: true, reason: 'not_connected' };
-  }
-  if (!TELEGRAM_BOT_TOKEN) {
-    console.log(`[telegram:dry-run] to=${chatId} template=${template} body="${body}"`);
-    return { dryRun: true, body };
-  }
-
+router.post('/webhook', async (req, res) => {
   try {
-    return await sendTelegramMessage(chatId, body);
-  } catch (err) {
-    console.error(`Telegram send failed for chat ${chatId}:`, err.message || err);
-    return { error: true };
-  }
-}
+    console.log('Telegram webhook hit. Raw body:', JSON.stringify(req.body));
 
-module.exports = { notify, sendTelegramMessage, TEMPLATES };
+    const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+    if (expectedSecret && req.headers['x-telegram-bot-api-secret-token'] !== expectedSecret) {
+      console.log('Telegram webhook rejected: secret mismatch');
+      return res.sendStatus(401);
+    }
+
+    const update = req.body;
+    const message = update?.message;
+    const text = message?.text || '';
+    const chatId = message?.chat?.id;
+
+    console.log(`Telegram parsed: text="${text}" chatId=${chatId}`);
+
+    if (text.startsWith('/start') && chatId) {
+      const payload = text.split(' ')[1] || '';
+      console.log(`Telegram /start payload: "${payload}"`);
+
+      if (payload.startsWith('connect_')) {
+        const phone = payload.slice('connect_'.length);
+        const { rowCount } = await pool.query(
+          `UPDATE customers SET telegram_chat_id = $1 WHERE phone = $2`,
+          [chatId, phone]
+        );
+        console.log(`connect_ matched phone=${phone}, rows updated: ${rowCount}`);
+        const sendResult = await sendTelegramMessage(
+          chatId,
+          rowCount > 0
+            ? TEMPLATES.telegram_connected()
+            : "We couldn't match this to an order yet — try tapping the link from your order tracking page again."
+        );
+        console.log('Telegram sendMessage result:', JSON.stringify(sendResult));
+      } else if (payload.startsWith('login_')) {
+        const loginToken = payload.slice('login_'.length);
+
+        const { rows } = await pool.query(
+          `SELECT * FROM login_attempts WHERE login_token = $1`,
+          [loginToken]
+        );
+        const attempt = rows[0];
+        console.log(`login_ lookup for token ${loginToken}: ${attempt ? 'found' : 'NOT FOUND'}`);
+
+        let replyText;
+        if (!attempt) {
+          replyText = "This login link isn't valid — go back to the site and try logging in again.";
+        } else if (attempt.confirmed_at) {
+          replyText = "This login link was already used. Go back to the site and start a fresh login if you need one.";
+        } else if (new Date(attempt.expires_at) < new Date()) {
+          replyText = "This login link expired — go back to the site and try again.";
+        } else {
+          const sessionToken = crypto.randomBytes(32).toString('hex');
+          await pool.query(
+            `UPDATE login_attempts SET confirmed_at = now(), session_token = $1 WHERE id = $2`,
+            [sessionToken, attempt.id]
+          );
+          await pool.query(
+            `UPDATE customers SET telegram_chat_id = $1 WHERE phone = $2`,
+            [chatId, attempt.phone]
+          );
+          console.log(`Login confirmed for phone ${attempt.phone}`);
+          replyText = "You're logged in! Head back to the site — it should update automatically within a few seconds.";
+        }
+
+        const sendResult = await sendTelegramMessage(chatId, replyText);
+        console.log('Telegram sendMessage result:', JSON.stringify(sendResult));
+      } else {
+        console.log('Telegram /start payload matched neither connect_ nor login_');
+      }
+    }
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error('Telegram webhook error:', err);
+    res.sendStatus(200);
+  }
+});
+
+module.exports = router;
