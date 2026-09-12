@@ -3,6 +3,7 @@ import Menu from './pages/Menu.jsx';
 import Checkout from './pages/Checkout.jsx';
 import OrderTracking from './pages/OrderTracking.jsx';
 import Login from './pages/Login.jsx';
+import Signup from './pages/Signup.jsx';
 import AdminLogin from './pages/AdminLogin.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import { useCart } from './CartContext.jsx';
@@ -50,6 +51,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Menu />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/track/:id" element={<OrderTracking />} />
           <Route path="/track/:id/:phone" element={<OrderTracking />} />

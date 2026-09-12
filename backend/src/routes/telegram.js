@@ -65,10 +65,12 @@ router.post('/webhook', async (req, res) => {
             [sessionToken, attempt.id]
           );
           await pool.query(
-            `INSERT INTO customers (full_name, phone, telegram_chat_id)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (phone) DO UPDATE SET telegram_chat_id = EXCLUDED.telegram_chat_id`,
-            [attempt.full_name || telegramFirstName, attempt.phone, chatId]
+            `INSERT INTO customers (full_name, phone, telegram_chat_id, password_hash)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (phone) DO UPDATE SET
+               telegram_chat_id = EXCLUDED.telegram_chat_id,
+               password_hash = EXCLUDED.password_hash`,
+            [attempt.full_name || telegramFirstName, attempt.phone, chatId, attempt.password_hash]
           );
           console.log(`Login confirmed for phone ${attempt.phone}`);
           replyText = "You're logged in! Head back to the site — it should update automatically within a few seconds.";
