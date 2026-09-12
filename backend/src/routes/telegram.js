@@ -76,6 +76,24 @@ router.post('/webhook', async (req, res) => {
       } else {
         console.log('Telegram /start payload matched neither connect_ nor login_');
       }
+    } else if (chatId && text) {
+      // Any message that isn't a /start command — forward it to you, so
+      // a customer replying to an order update actually reaches someone.
+      const adminChatId = process.env.ADMIN_TELEGRAM_CHAT_ID;
+      if (adminChatId) {
+        const { rows } = await pool.query(
+          `SELECT full_name, phone FROM customers WHERE telegram_chat_id = $1`,
+          [chatId]
+        );
+        const customer = rows[0];
+        const fromLabel = customer
+          ? `${customer.full_name} (${customer.phone})`
+          : `Unknown Telegram user (chat ${chatId})`;
+        const forwarded = await sendTelegramMessage(adminChatId, `Message from ${fromLabel}:\n${text}`);
+        console.log('Forwarded customer message to admin:', JSON.stringify(forwarded));
+      } else {
+        console.log('ADMIN_TELEGRAM_CHAT_ID not set — customer message not forwarded');
+      }
     }
 
     res.sendStatus(200);
