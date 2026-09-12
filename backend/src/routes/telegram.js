@@ -19,6 +19,7 @@ router.post('/webhook', async (req, res) => {
     const message = update?.message;
     const text = message?.text || '';
     const chatId = message?.chat?.id;
+    const telegramFirstName = message?.from?.first_name || 'Telegram user';
 
     console.log(`Telegram parsed: text="${text}" chatId=${chatId}`);
 
@@ -64,8 +65,10 @@ router.post('/webhook', async (req, res) => {
             [sessionToken, attempt.id]
           );
           await pool.query(
-            `UPDATE customers SET telegram_chat_id = $1 WHERE phone = $2`,
-            [chatId, attempt.phone]
+            `INSERT INTO customers (full_name, phone, telegram_chat_id)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (phone) DO UPDATE SET telegram_chat_id = EXCLUDED.telegram_chat_id`,
+            [attempt.full_name || telegramFirstName, attempt.phone, chatId]
           );
           console.log(`Login confirmed for phone ${attempt.phone}`);
           replyText = "You're logged in! Head back to the site — it should update automatically within a few seconds.";

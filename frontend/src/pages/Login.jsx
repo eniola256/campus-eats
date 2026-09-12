@@ -7,6 +7,7 @@ export default function Login() {
   const { completeLogin } = useCustomerAuth();
   const navigate = useNavigate();
 
+  const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [loginToken, setLoginToken] = useState(null);
   const [status, setStatus] = useState('idle'); // idle | starting | waiting | expired | error
@@ -18,7 +19,7 @@ export default function Login() {
     setError(null);
     setStatus('starting');
     try {
-      const { loginToken } = await api.authStart(phone);
+      const { loginToken } = await api.authStart(phone, fullName);
       setLoginToken(loginToken);
       setStatus('waiting');
     } catch (err) {
@@ -57,6 +58,7 @@ export default function Login() {
     setStatus('idle');
     setLoginToken(null);
     setPhone('');
+    setFullName('');
   }
 
   const telegramLink = loginToken
@@ -69,6 +71,9 @@ export default function Login() {
 
       {status === 'idle' && (
         <form onSubmit={handleStart} className="checkout-form">
+          <label>Full name
+            <input value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Your name" required />
+          </label>
           <label>Phone number
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09162323354" required />
           </label>
