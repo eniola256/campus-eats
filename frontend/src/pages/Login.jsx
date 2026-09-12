@@ -45,6 +45,9 @@ export default function Login() {
       <p className="note" style={{ marginTop: '1rem' }}>
         New here? <Link to="/signup">Sign up</Link>
       </p>
+      <p className="note" style={{ marginTop: '0.5rem' }}>
+        <Link to="/forgot-password">Forgot password?</Link>
+      </p>
     </div>
   );
 }

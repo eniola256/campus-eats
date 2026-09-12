@@ -26,6 +26,9 @@ export const api = {
   authLogout: (sessionToken) =>
     request('/auth/logout', { method: 'DELETE', headers: { Authorization: `Bearer ${sessionToken}` } }),
 
+  authForgotPassword: (phone, newPassword) =>
+    request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ phone, newPassword }) }),
+
   adminLogin: (email, password) =>
     request('/admin/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
   adminGetOrders: (token, status) =>

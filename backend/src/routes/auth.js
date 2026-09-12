@@ -164,4 +164,44 @@ router.delete('/logout', async (req, res) => {
   res.json({ ok: true });
 });
 
+// POST /api/auth/forgot-password  { phone, newPassword }
+// Reuses the exact same Telegram-confirmation mechanism as signup — the
+// webhook's existing "ON CONFLICT DO UPDATE SET password_hash = ..."
+// logic already overwrites the password once confirmed, so nothing
+// there needs to change. This endpoint just needs to exist to let
+// someone start that process without re-entering their name.
+router.post('/forgot-password', async (req, res, next) => {
+  try {
+    const { phone, newPassword } = req.body;
+    if (!phone || phone.trim().length < 8) {
+      return res.status(400).json({ error: 'A valid phone number is required' });
+    }
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    const { rows } = await pool.query(`SELECT phone FROM customers WHERE phone = $1`, [phone.trim()]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'No account found for this phone number — try signing up instead.' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    const loginToken = crypto.randomBytes(20).toString('hex');
+    const expiresAt = new Date(Date.now() + LOGIN_EXPIRY_MINUTES * 60 * 1000);
+
+    await pool.query(
+      `INSERT INTO login_attempts (phone, password_hash, login_token, expires_at)
+       VALUES ($1, $2, $3, $4)`,
+      [phone.trim(), passwordHash, loginToken, expiresAt]
+    );
+
+    res.status(201).json({
+      loginToken,
+      expiresInSeconds: LOGIN_EXPIRY_MINUTES * 60,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
