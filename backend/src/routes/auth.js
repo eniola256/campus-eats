@@ -13,7 +13,7 @@ router.post('/start', async (req, res, next) => {
       return res.status(400).json({ error: 'A valid phone number is required' });
     }
 
-    const loginToken = crypto.randomBytes(32).toString('hex');
+    const loginToken = crypto.randomBytes(20).toString('hex');;
     const expiresAt = new Date(Date.now() + LOGIN_EXPIRY_MINUTES * 60 * 1000);
 
     await pool.query(
