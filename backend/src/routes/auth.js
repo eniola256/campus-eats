@@ -6,6 +6,7 @@ const pool = require('../db/pool');
 const router = express.Router();
 
 const LOGIN_EXPIRY_MINUTES = 10;
+const SESSION_EXPIRY_DAYS = 30;
 
 // POST /api/auth/signup  { fullName, phone, password }
 // Only used ONCE per customer. Doesn't create the account yet — first
@@ -20,8 +21,8 @@ router.post('/signup', async (req, res, next) => {
     if (!fullName || fullName.trim().length < 2) {
       return res.status(400).json({ error: 'A name is required' });
     }
-    if (!password || password.length < 6) {
-      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    if (!password || password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -56,7 +57,7 @@ router.get('/status/:loginToken', async (req, res, next) => {
     if (!attempt) {
       return res.status(404).json({ status: 'not_found' });
     }
-    if (new Date(attempt.expires_at) < new Date()) {
+    if (new Date(attempt.expires_at) < new Date() && !attempt.confirmed_at) {
       return res.json({ status: 'expired' });
     }
     if (!attempt.confirmed_at) {
@@ -81,7 +82,13 @@ router.get('/status/:loginToken', async (req, res, next) => {
 // POST /api/auth/login  { phone, password }
 // Every login after the first. No Telegram involved at all — just checks
 // the password against the hash saved during signup.
+//
+// Security note: the error message is deliberately IDENTICAL whether the
+// phone has no account or the password is just wrong. Distinguishing
+// those would let someone quietly discover which phone numbers have
+// accounts at all, just by trying to log in with them.
 router.post('/login', async (req, res, next) => {
+  const genericError = 'Invalid phone number or password.';
   try {
     const { phone, password } = req.body;
     if (!phone || !password) {
@@ -92,25 +99,22 @@ router.post('/login', async (req, res, next) => {
     const customer = rows[0];
 
     if (!customer || !customer.password_hash) {
-      return res.status(401).json({ error: 'No account found for this phone number — try signing up.' });
+      return res.status(401).json({ error: genericError });
     }
 
     const valid = await bcrypt.compare(password, customer.password_hash);
     if (!valid) {
-      return res.status(401).json({ error: 'Incorrect password.' });
+      return res.status(401).json({ error: genericError });
     }
 
-    // Reuse the login_attempts table as a simple session store — a
-    // password check IS the confirmation here, so we mark it confirmed
-    // immediately instead of waiting on Telegram.
     const sessionToken = crypto.randomBytes(20).toString('hex');
-    const throwawayLoginToken = crypto.randomBytes(20).toString('hex'); // never shown anywhere, just satisfies the unique column
-    const farFuture = new Date(Date.now() + 1000 * 60 * 60 * 24 * 365); // 1 year — see note in CustomerAuthContext about session lifetime
+    const throwawayLoginToken = crypto.randomBytes(20).toString('hex');
+    const expiresAt = new Date(Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
 
     await pool.query(
       `INSERT INTO login_attempts (phone, login_token, confirmed_at, session_token, expires_at)
        VALUES ($1, $2, now(), $3, $4)`,
-      [customer.phone, throwawayLoginToken, sessionToken, farFuture]
+      [customer.phone, throwawayLoginToken, sessionToken, expiresAt]
     );
 
     res.json({
@@ -128,7 +132,11 @@ router.post('/login', async (req, res, next) => {
 });
 
 // GET /api/auth/me — restores login state on page load from a saved
-// session token.
+// session token. Also enforces real expiry now (previously this only
+// checked confirmed_at, meaning a session effectively never expired) —
+// and slides the expiry forward on every successful check, so an
+// actively-used session stays logged in indefinitely while an idle or
+// stolen token eventually stops working on its own.
 router.get('/me', async (req, res) => {
   const header = req.headers.authorization || '';
   const sessionToken = header.startsWith('Bearer ') ? header.slice(7) : null;
@@ -136,10 +144,17 @@ router.get('/me', async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT phone FROM login_attempts WHERE session_token = $1 AND confirmed_at IS NOT NULL`,
+      `SELECT phone, expires_at FROM login_attempts
+       WHERE session_token = $1 AND confirmed_at IS NOT NULL`,
       [sessionToken]
     );
     if (rows.length === 0) return res.status(401).json({ error: 'Session not found' });
+    if (new Date(rows[0].expires_at) < new Date()) {
+      return res.status(401).json({ error: 'Session expired' });
+    }
+
+    const newExpiry = new Date(Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+    await pool.query(`UPDATE login_attempts SET expires_at = $1 WHERE session_token = $2`, [newExpiry, sessionToken]);
 
     const { rows: customerRows } = await pool.query(
       `SELECT full_name, phone, hostel, room_or_gate FROM customers WHERE phone = $1`,
@@ -168,16 +183,15 @@ router.delete('/logout', async (req, res) => {
 // Reuses the exact same Telegram-confirmation mechanism as signup — the
 // webhook's existing "ON CONFLICT DO UPDATE SET password_hash = ..."
 // logic already overwrites the password once confirmed, so nothing
-// there needs to change. This endpoint just needs to exist to let
-// someone start that process without re-entering their name.
+// there needs to change.
 router.post('/forgot-password', async (req, res, next) => {
   try {
     const { phone, newPassword } = req.body;
     if (!phone || phone.trim().length < 8) {
       return res.status(400).json({ error: 'A valid phone number is required' });
     }
-    if (!newPassword || newPassword.length < 6) {
-      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
     }
 
     const { rows } = await pool.query(`SELECT phone FROM customers WHERE phone = $1`, [phone.trim()]);

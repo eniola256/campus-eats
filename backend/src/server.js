@@ -12,16 +12,15 @@ const telegramRouter = require('./routes/telegram');
 const authRouter = require('./routes/auth');
 
 const app = express();
+
 app.set('trust proxy', 1);
 
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
 
-// Basic abuse protection on write-heavy public endpoints
 const orderLimiter = rateLimit({ windowMs: 60 * 1000, max: 20 });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
 
-// The Paystack webhook needs the RAW body for signature verification, so it
-// must be mounted BEFORE the global express.json() body parser.
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 
 app.use(express.json());
@@ -33,10 +32,8 @@ app.use('/api/orders', orderLimiter, ordersRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/telegram', telegramRouter);
-app.use('/api/auth', authRouter);
+app.use('/api/auth', authLimiter, authRouter);
 
-
-// Central error handler — keeps stack traces out of responses.
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(err.status || 500).json({ error: err.message || 'Something went wrong' });

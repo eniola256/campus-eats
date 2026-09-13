@@ -69,7 +69,7 @@ export default function ForgotPassword() {
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09162323354" required />
           </label>
           <label>New password
-            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={6} required />
+            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} minLength={8} required />
           </label>
           {error && <p className="state-msg error">{error}</p>}
           <button className="btn-primary" type="submit">Continue</button>

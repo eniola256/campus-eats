@@ -73,7 +73,7 @@ export default function Signup() {
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09162323354" required />
           </label>
           <label>Password
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required />
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
           </label>
           {error && <p className="state-msg error">{error}</p>}
           <button className="btn-primary" type="submit">Continue</button>

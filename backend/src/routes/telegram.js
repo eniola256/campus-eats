@@ -4,6 +4,7 @@ const pool = require('../db/pool');
 const { sendTelegramMessage, TEMPLATES } = require('../services/telegram');
 
 const router = express.Router();
+const SESSION_EXPIRY_DAYS = 30;
 
 router.post('/webhook', async (req, res) => {
   try {
@@ -60,9 +61,17 @@ router.post('/webhook', async (req, res) => {
           replyText = "This login link expired — go back to the site and try again.";
         } else {
           const sessionToken = crypto.randomBytes(32).toString('hex');
+          // IMPORTANT: expires_at up to now was still the short 10-minute
+          // signup window — must be pushed out to a real session lifetime
+          // here, or /me would immediately see this session as "expired"
+          // the moment expiry is actually enforced there.
+          const sessionExpiresAt = new Date(Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
           await pool.query(
-            `UPDATE login_attempts SET confirmed_at = now(), session_token = $1 WHERE id = $2`,
-            [sessionToken, attempt.id]
+            `UPDATE login_attempts
+             SET confirmed_at = now(), session_token = $1, expires_at = $2
+             WHERE id = $3`,
+            [sessionToken, sessionExpiresAt, attempt.id]
           );
           await pool.query(
             `INSERT INTO customers (full_name, phone, telegram_chat_id, password_hash)
@@ -82,8 +91,6 @@ router.post('/webhook', async (req, res) => {
         console.log('Telegram /start payload matched neither connect_ nor login_');
       }
     } else if (chatId && text) {
-      // Any message that isn't a /start command — forward it to you, so
-      // a customer replying to an order update actually reaches someone.
       const adminChatId = process.env.ADMIN_TELEGRAM_CHAT_ID;
       if (adminChatId) {
         const { rows } = await pool.query(
