@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useCustomerAuth } from '../CustomerAuthContext.jsx';
+import PasswordInput from '../components/PasswordInput.jsx';
 
 export default function Signup() {
   const { completeLogin } = useCustomerAuth();
@@ -11,7 +12,7 @@ export default function Signup() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [loginToken, setLoginToken] = useState(null);
-  const [status, setStatus] = useState('idle'); // idle | starting | waiting | expired
+  const [status, setStatus] = useState('idle');
   const [error, setError] = useState(null);
   const pollRef = useRef(null);
 
@@ -73,7 +74,7 @@ export default function Signup() {
             <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09162323354" required />
           </label>
           <label>Password
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
           </label>
           {error && <p className="state-msg error">{error}</p>}
           <button className="btn-primary" type="submit">Continue</button>

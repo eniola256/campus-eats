@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { api } from '../api.js';
 import { useCustomerAuth } from '../CustomerAuthContext.jsx';
+import PasswordInput from '../components/PasswordInput.jsx';
 
 export default function Login() {
   const { completeLogin } = useCustomerAuth();
@@ -39,7 +40,7 @@ export default function Login() {
           <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09162323354" required disabled={blocked} />
         </label>
         <label>Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={blocked} />
+          <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required disabled={blocked} />
         </label>
         {error && <p className="state-msg error">{error}</p>}
         <button className="btn-primary" type="submit" disabled={submitting || blocked}>
