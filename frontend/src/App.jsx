@@ -1,4 +1,5 @@
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
+import Landing from './pages/Landing.jsx';
 import Menu from './pages/Menu.jsx';
 import Checkout from './pages/Checkout.jsx';
 import OrderTracking from './pages/OrderTracking.jsx';
@@ -25,6 +26,9 @@ function Header() {
         <span className="brand-name">Campus Eats</span>
       </Link>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <Link to="/menu" className="btn-secondary" style={{ textDecoration: 'none', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
+          Menu
+        </Link>
         {customer ? (
           <>
             <Link to="/my-orders" className="btn-secondary" style={{ textDecoration: 'none', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
@@ -54,7 +58,8 @@ export default function App() {
       <Header />
       <main>
         <Routes>
-          <Route path="/" element={<Menu />} />
+          <Route path="/" element={<Landing />} />
+          <Route path="/menu" element={<Menu />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />

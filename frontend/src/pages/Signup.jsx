@@ -39,7 +39,7 @@ export default function Signup() {
         if (result.status === 'confirmed') {
           clearInterval(pollRef.current);
           completeLogin(result.sessionToken, result.customer);
-          navigate('/');
+          navigate('/menu');
         } else if (result.status === 'expired') {
           clearInterval(pollRef.current);
           setStatus('expired');

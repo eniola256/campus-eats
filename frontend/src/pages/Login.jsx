@@ -21,7 +21,7 @@ export default function Login() {
     try {
       const { sessionToken, customer } = await api.authLogin(phone, password);
       completeLogin(sessionToken, customer);
-      navigate('/');
+      navigate('/menu');
     } catch (err) {
       setError(err.message);
       if (err.message.includes('cannot log in at this time')) {
