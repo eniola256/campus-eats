@@ -11,6 +11,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [blocked, setBlocked] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -22,6 +23,9 @@ export default function Login() {
       navigate('/');
     } catch (err) {
       setError(err.message);
+      if (err.message.includes('cannot log in at this time')) {
+        setBlocked(true);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -32,14 +36,14 @@ export default function Login() {
       <h1>Log in</h1>
       <form onSubmit={handleSubmit} className="checkout-form">
         <label>Phone number
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09162323354" required />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09162323354" required disabled={blocked} />
         </label>
         <label>Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required disabled={blocked} />
         </label>
         {error && <p className="state-msg error">{error}</p>}
-        <button className="btn-primary" type="submit" disabled={submitting}>
-          {submitting ? 'Logging in…' : 'Log in'}
+        <button className="btn-primary" type="submit" disabled={submitting || blocked}>
+          {blocked ? 'Try again later' : submitting ? 'Logging in…' : 'Log in'}
         </button>
       </form>
       <p className="note" style={{ marginTop: '1rem' }}>

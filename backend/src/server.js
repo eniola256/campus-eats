@@ -19,7 +19,13 @@ app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL || '*' }));
 
 const orderLimiter = rateLimit({ windowMs: 60 * 1000, max: 20 });
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 10 });
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  handler: (req, res) => {
+    res.status(429).json({ error: 'You cannot log in at this time, try again later.' });
+  },
+});
 
 app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 
