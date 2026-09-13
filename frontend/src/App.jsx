@@ -2,6 +2,7 @@ import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import Menu from './pages/Menu.jsx';
 import Checkout from './pages/Checkout.jsx';
 import OrderTracking from './pages/OrderTracking.jsx';
+import MyOrders from './pages/MyOrders.jsx';
 import Login from './pages/Login.jsx';
 import Signup from './pages/Signup.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
@@ -26,6 +27,9 @@ function Header() {
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
         {customer ? (
           <>
+            <Link to="/my-orders" className="btn-secondary" style={{ textDecoration: 'none', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
+              My orders
+            </Link>
             <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Hi, {customer.full_name || customer.phone}</span>
             <button className="btn-secondary" onClick={logout} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
               Log out
@@ -54,6 +58,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/my-orders" element={<MyOrders />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/track/:id" element={<OrderTracking />} />
           <Route path="/track/:id/:phone" element={<OrderTracking />} />

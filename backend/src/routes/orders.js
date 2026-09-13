@@ -2,7 +2,8 @@ const express = require('express');
 const pool = require('../db/pool');
 const { calculateFees, MIN_ORDER_KOBO } = require('../services/fees');
 const { initializeTransaction } = require('../services/monnify');
-const { notify } = require('../services/whatsapp');
+const { notify } = require('../services/telegram');
+const { requireCustomer } = require('../middleware/customerAuth');
 
 const router = express.Router();
 
@@ -113,6 +114,28 @@ router.post('/', async (req, res, next) => {
     next(err);
   } finally {
     client.release();
+  }
+});
+
+// GET /api/orders/mine — every order for the logged-in customer, most
+// recent first. This is what powers the "My Orders" page — it's the
+// answer to "once I leave the tracking page, how do I find my order
+// again?" Requires a customer session (phone+password or a confirmed
+// Telegram login), not just knowing a phone number, since this shows
+// their FULL order history, not just one order.
+router.get('/mine', requireCustomer, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query(
+      `SELECT o.id, o.status, o.total_kobo, o.delivery_hostel, o.created_at
+       FROM orders o
+       JOIN customers c ON c.id = o.customer_id
+       WHERE c.phone = $1
+       ORDER BY o.created_at DESC`,
+      [req.customerPhone]
+    );
+    res.json(rows);
+  } catch (err) {
+    next(err);
   }
 });
 

@@ -14,6 +14,8 @@ export const api = {
   getProducts: () => request('/products'),
   createOrder: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload) }),
   getOrder: (id, phone) => request(`/orders/${id}?phone=${encodeURIComponent(phone)}`),
+  getMyOrders: (sessionToken) =>
+    request('/orders/mine', { headers: { Authorization: `Bearer ${sessionToken}` } }),
   verifyPayment: (reference) => request(`/payments/verify/${reference}`),
 
   authSignup: (fullName, phone, password) =>
@@ -25,7 +27,6 @@ export const api = {
     request('/auth/me', { headers: { Authorization: `Bearer ${sessionToken}` } }),
   authLogout: (sessionToken) =>
     request('/auth/logout', { method: 'DELETE', headers: { Authorization: `Bearer ${sessionToken}` } }),
-
   authForgotPassword: (phone, newPassword) =>
     request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ phone, newPassword }) }),
 
