@@ -1,57 +1,34 @@
-@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
-  --charcoal: #211c16;
-  --paper: #fbf6ec;
-  --mustard: #e8a33d;
-  --mustard-deep: #c9821c;
-  --teal: #2b6e63;
-  --red: #c1432e;
-  --line: #d8cdb8;
-  --radius: 4px;
+  --background:   #FFF8E8;
+  --primary   :    #176B3A;
+  --accent   :   #F4B400;
+  --secondary:   #2E8B57;
+  --text:     #182015;
+  --error:    #c1432e;
+}
+
+p{
+  color: var(--text);
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  background: var(--paper);
-  color: var(--charcoal);
-  font-family: 'Space Grotesk', sans-serif;
+  background: var(--background);
+  color: var(--text);
+  font-family: 'Fredoka', sans-serif;
 }
-
-h1, h2, h3 { font-family: 'Archivo Black', 'Space Grotesk', sans-serif; text-transform: none; line-height: 1.1; margin: 0 0 0.5rem; }
-.price, .cart-line-total, .totals-row, .ticket-total, .ticket-items, .queue-meta, .ticket-eyebrow {
-  font-family: 'IBM Plex Mono', monospace;
-}
-
-
-
-a { color: inherit; }
-
-.app-shell { max-width: 900px; margin: 0 auto; padding: 0 1.25rem 4rem; }
-
-.site-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 1.25rem 0; border-bottom: 3px solid var(--charcoal);
-  margin-bottom: 2rem;
-}
-.brand { display: flex; align-items: center; gap: 0.6rem; text-decoration: none; }
-.brand-mark {
-  background: var(--mustard); color: var(--charcoal); font-family: 'Archivo Black', sans-serif;
-  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
-  border: 2px solid var(--charcoal); border-radius: var(--radius);
-}
-.brand-name { font-family: 'Archivo Black', sans-serif; font-size: 1.1rem; }
-.cart-pill {
-  border: 2px solid var(--charcoal); padding: 0.5rem 1rem; border-radius: 999px;
-  text-decoration: none; font-weight: 600; display: flex; gap: 0.4rem; align-items: center;
+a{
+  text-decoration: none;
+  color: inherit;
 }
 .cart-count { background: var(--red); color: var(--paper); border-radius: 999px; padding: 0 0.5rem; font-family: 'IBM Plex Mono', monospace; }
 
 .hero { padding: 2rem 0 2.5rem; border-bottom: 1px dashed var(--line); margin-bottom: 2rem; }
 .hero-eyebrow { text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.8rem; color: var(--mustard-deep); font-weight: 600; margin: 0 0 0.75rem; }
-.hero h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); max-width: 22ch; }
+
 .hero-sub { color: #5b5346; margin-top: 0.75rem; }
 
 .menu-section { margin-bottom: 2.5rem; }
