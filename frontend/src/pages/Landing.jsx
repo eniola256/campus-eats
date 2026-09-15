@@ -5,7 +5,6 @@ import './Landing.css';
 
 export default function Landing() {
   const { customer } = useCustomerAuth();
-
   return (
     <div className="landing-page">
       <section className="hero">
