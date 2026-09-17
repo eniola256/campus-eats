@@ -35,38 +35,139 @@
     display: inline-block; 
     padding-bottom: 2px; 
 }
-.product-grid { 
-    display: grid; 
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
-    gap: 1rem; 
-    margin-top: 1rem; 
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
 }
 .product-card {
-  border: 2px solid var(--charcoal); 
-  border-radius: var(--radius); 
+  border: 2px solid var(--text, var(--charcoal));
+  border-radius: var(--radius);
   padding: 1rem;
-  display: flex; 
-  flex-direction: column; 
-  justify-content: space-between; 
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
   background: white;
 }
 .product-card h3 {
-    font-size: 1rem; 
-    font-weight: 700; 
+  font-size: 1rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
 }
-.product-desc { 
-    font-size: 0.85rem; 
-    color: #6b6255; margin: 0.3rem 0 0.6rem; 
+.product-desc {
+  font-size: 0.85rem;
+  color: #6b6255;
+  margin: 0.3rem 0 0.6rem;
 }
-.price { 
-    font-weight: 600; 
+.price {
+  font-weight: 600;
 }
 .btn-add {
-  margin-top: 0.75rem; 
-  border: 2px solid var(--charcoal); 
-  background: var(--mustard);
-  padding: 0.5rem; 
-  border-radius: var(--radius); 
-  font-weight: 700; cursor: pointer;
+  margin-top: 0.75rem;
+  border: 2px solid var(--text, var(--charcoal));
+  background: var(--accent, var(--mustard));
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  font-weight: 700;
+  cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif;
 }
-.btn-add:hover { background: var(--mustard-deep); }
+.btn-add:hover {
+  background: var(--accent-deep, var(--mustard-deep));
+}
+
+/* --- Shops / Food tabs --- */
+.menu-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin: 1.5rem 0 0;
+  border-bottom: 2px solid var(--line);
+}
+.menu-tab {
+  background: none;
+  border: none;
+  padding: 0.75rem 1.25rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #8a806e;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+.menu-tab.active {
+  color: var(--text, var(--charcoal));
+  border-bottom-color: var(--primary, var(--teal));
+}
+
+/* --- Shop cards --- */
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+  padding: 0 2rem 2rem;
+}
+
+@media (max-width: 640px) {
+  .shop-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.shop-card {
+  border: none;
+  border-radius: 20px;
+  background: white;
+  padding: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+  font-family: 'Space Grotesk', sans-serif;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 8px 20px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.shop-card:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.05),
+    0 14px 28px rgba(0, 0, 0, 0.1);
+}
+
+.shop-image {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 14px;
+  background: var(--line);
+  object-fit: cover;
+  display: block;
+}
+
+.shop-name {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0;
+  padding: 0 0.35rem;
+}
+
+.shop-stars {
+  color: var(--accent-deep, var(--mustard-deep));
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.35rem 0.35rem;
+}
+
+.shop-rating-number {
+  font-family: 'IBM Plex Mono', monospace;
+  color: #6b6255;
+  font-size: 0.8rem;
+}
