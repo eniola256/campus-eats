@@ -23,27 +23,10 @@ a{
   text-decoration: none;
   color: inherit;
 }
-.cart-count { background: var(--red); color: var(--paper); border-radius: 999px; padding: 0 0.5rem; font-family: 'IBM Plex Mono', monospace; }
 
 .state-msg { padding: 2rem 0; color: #6b6255; }
 .state-msg.error { color: var(--red); font-weight: 600; }
 
-.checkout-page h1 { margin-bottom: 1.5rem; }
-.cart-list { list-style: none; padding: 0; margin: 0 0 1.5rem; border-top: 1px dashed var(--line); }
-.cart-row { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px dashed var(--line); gap: 1rem; }
-.cart-name { flex: 1; font-weight: 600; }
-.qty-control { display: flex; align-items: center; gap: 0.5rem; }
-.qty-control button { width: 28px; height: 28px; border: 2px solid var(--charcoal); background: white; border-radius: var(--radius); cursor: pointer; font-weight: 700; }
-.totals { background: var(--charcoal); color: var(--paper); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 2rem; }
-.totals-row { display: flex; justify-content: space-between; font-size: 1.1rem; font-weight: 600; }
-.totals-note { font-size: 0.8rem; opacity: 0.75; margin: 0.4rem 0 0; font-family: 'Space Grotesk', sans-serif; }
-
-.checkout-form { display: flex; flex-direction: column; gap: 1rem; max-width: 420px; }
-.checkout-form label { display: flex; flex-direction: column; gap: 0.4rem; font-weight: 600; font-size: 0.9rem; }
-.checkout-form input {
-  border: 2px solid var(--charcoal); border-radius: var(--radius); padding: 0.65rem 0.75rem;
-  font-family: 'Space Grotesk', sans-serif; font-size: 1rem;
-}
 .btn-primary {
   background: var(--teal); color: var(--paper); border: none; border-radius: var(--radius);
   padding: 0.85rem; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 0.5rem;

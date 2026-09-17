@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useCart } from '../CartContext.jsx';
 import { useCustomerAuth } from '../CustomerAuthContext.jsx';
 import { api, formatNaira } from '../api.js';
+import './Checkout.css';
 
 const MIN_ORDER_KOBO = 150000;
 
@@ -14,11 +15,6 @@ export default function Checkout() {
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
-  // If someone's logged in, pre-fill whatever we already know about them —
-  // a returning customer shouldn't have to retype their hostel every time.
-  // Using a separate effect (rather than initializing useState directly)
-  // handles the case where login state finishes restoring itself a moment
-  // AFTER this page has already started rendering.
   useEffect(() => {
     if (customer) {
       setForm((prev) => ({

@@ -1,7 +1,7 @@
 .menu-page .hero { 
-    padding: 2rem 0 2.5rem; 
+    padding: 1rem 0 2.5rem; 
     border-bottom: 1px dashed var(--line); 
-    margin-bottom: 2rem; 
+    
 }
 .menu-page .hero-eyebrow { 
     text-transform: uppercase; 
@@ -82,8 +82,8 @@
 .menu-tabs {
   display: flex;
   gap: 0.5rem;
-  margin: 1.5rem 0 0;
   border-bottom: 2px solid var(--line);
+  padding-left: 2rem;
 }
 .menu-tab {
   background: none;

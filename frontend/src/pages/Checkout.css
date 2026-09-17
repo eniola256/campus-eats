@@ -1,0 +1,130 @@
+.checkout-page {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.checkout-page h1 {
+  margin-bottom: 1.5rem;
+}
+
+/* --- Cart items: soft floating rows instead of a plain divided list --- */
+.cart-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.cart-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: white;
+  border-radius: 16px;
+  padding: 0.85rem 1.1rem;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 6px 16px rgba(0, 0, 0, 0.05);
+}
+
+.cart-name {
+  flex: 1;
+  font-weight: 600;
+}
+
+.qty-control {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.qty-control button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: #f2efe6;
+  border-radius: 50%;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.qty-control button:hover {
+  background: var(--line);
+  transform: scale(1.05);
+}
+
+.cart-line-total {
+  font-weight: 600;
+  min-width: 4.5rem;
+  text-align: right;
+}
+
+/* --- Totals: a soft light card instead of a solid dark block --- */
+.totals {
+  background: white;
+  border-radius: 18px;
+  padding: 1.1rem 1.3rem;
+  margin-bottom: 2rem;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 8px 20px rgba(0, 0, 0, 0.06);
+}
+
+.totals-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.totals-note {
+  font-size: 0.8rem;
+  color: #8a806e;
+  margin: 0.4rem 0 0;
+}
+
+/* --- Form: soft-bordered inputs with a gentle focus ring --- */
+.checkout-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.checkout-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.checkout-form input {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1rem;
+  background: white;
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.checkout-form input:focus {
+  outline: none;
+  border-color: var(--primary, var(--teal));
+  box-shadow: 0 0 0 3px rgba(23, 107, 58, 0.12);
+}
+
+.checkout-form button[type="submit"] {
+  border-radius: 999px;
+  margin-top: 0.5rem;
+}
