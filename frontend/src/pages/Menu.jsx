@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, formatNaira } from '../api.js';
 import { useCart } from '../CartContext.jsx';
+import './Menu.css';
 
 export default function Menu() {
   const [products, setProducts] = useState([]);
@@ -27,7 +28,7 @@ export default function Menu() {
     <div className="menu-page">
       <section className="hero">
         <p className="hero-eyebrow">One shop. One order. Delivered to your gate.</p>
-        <h1>Order from the busiest kitchen on campus — without leaving your room.</h1>
+        <h1 className="menu-hero">Order from the busiest kitchen on campus — without leaving your room.</h1>
         <p className="hero-sub">Minimum order ₦1,500 · Pay by card or transfer · We walk it to your hostel</p>
       </section>
 

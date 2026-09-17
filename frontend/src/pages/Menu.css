@@ -1,0 +1,72 @@
+.menu-page .hero { 
+    padding: 2rem 0 2.5rem; 
+    border-bottom: 1px dashed var(--line); 
+    margin-bottom: 2rem; 
+}
+.menu-page .hero-eyebrow { 
+    text-transform: uppercase; 
+    letter-spacing: 0.08em; 
+    font-size: 0.8rem; 
+    color: var(--mustard-deep); 
+    font-weight: 600; margin: 0 0 0.75rem; 
+}
+.menu-hero{
+    font-size: clamp(2.4rem, 6vw, 10rem);
+    font-weight: 600;
+    line-height: 1.05;
+    margin: 0;
+    color: var(--primary);
+    padding: 0 2.5rem;
+}
+.hero-sub { 
+    color: #5b5346; 
+    margin-top: 0.75rem; 
+}
+
+.menu-section { 
+    margin-bottom: 2.5rem; 
+}
+.menu-section h2 { 
+    font-size: 1.1rem; 
+    text-transform: uppercase; 
+    letter-spacing: 0.06em; 
+    color: var(--teal); 
+    border-bottom: 2px solid var(--teal); 
+    display: inline-block; 
+    padding-bottom: 2px; 
+}
+.product-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); 
+    gap: 1rem; 
+    margin-top: 1rem; 
+}
+.product-card {
+  border: 2px solid var(--charcoal); 
+  border-radius: var(--radius); 
+  padding: 1rem;
+  display: flex; 
+  flex-direction: column; 
+  justify-content: space-between; 
+  background: white;
+}
+.product-card h3 {
+    font-size: 1rem; 
+    font-weight: 700; 
+}
+.product-desc { 
+    font-size: 0.85rem; 
+    color: #6b6255; margin: 0.3rem 0 0.6rem; 
+}
+.price { 
+    font-weight: 600; 
+}
+.btn-add {
+  margin-top: 0.75rem; 
+  border: 2px solid var(--charcoal); 
+  background: var(--mustard);
+  padding: 0.5rem; 
+  border-radius: var(--radius); 
+  font-weight: 700; cursor: pointer;
+}
+.btn-add:hover { background: var(--mustard-deep); }

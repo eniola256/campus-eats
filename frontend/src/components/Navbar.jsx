@@ -5,7 +5,7 @@ import './Navbar.css';
 
 export default function Navbar() {
   const { items } = useCart();
-  const { customer } = useCustomerAuth();
+  const { customer, logout } = useCustomerAuth();
   const location = useLocation();
 
   const count = items.reduce((n, i) => n + i.quantity, 0);
@@ -18,6 +18,25 @@ export default function Navbar() {
         <span className="brand-name">Yaba-deli</span>
       </Link>
 
+      {customer && (
+        <nav className="nav-group">
+          <Link to="/menu" className="nav-item">
+            Menu
+          </Link>
+
+          <Link to="/checkout" className="nav-item">
+            Cart
+            {count > 0 && (
+              <span className="cart-count">{count}</span>
+            )}
+          </Link>
+
+          <Link to="/my-orders" className="nav-item">
+            Orders
+          </Link>
+        </nav>
+      )}
+
       <div className="navbar-actions">
         {!customer ? (
           <Link
@@ -29,24 +48,13 @@ export default function Navbar() {
           </Link>
         ) : (
           <>
-            <Link to="/menu" className="nav-pill">
-              Menu
-            </Link>
-
-            <Link to="/checkout" className="nav-pill">
-              Cart
-              {count > 0 && (
-                <span className="cart-count">{count}</span>
-              )}
-            </Link>
-
-            <Link to="/my-orders" className="nav-pill">
-              Orders
-            </Link>
-
             <span className="nav-pill navbar-greeting">
               Welcome, {customer.full_name || customer.phone}
             </span>
+
+            <button className="nav-pill" onClick={logout}>
+              Log out
+            </button>
           </>
         )}
       </div>

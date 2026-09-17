@@ -1,16 +1,17 @@
 .site-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  padding: 1.5rem ;
+  padding: 1.5rem;
   width: 100%;
 }
 
-.brand,
-.nav-pill {
+.brand {
+  justify-self: start;
   display: flex;
   align-items: center;
   text-decoration: none;
+  padding: 0.5rem 1rem;
   border: 2px solid rgba(175, 172, 172, 0.205);
   border-radius: 999px;
   box-shadow:
@@ -18,28 +19,65 @@
     0 3px 8px rgba(0, 0, 0, 0.212);
 }
 
-.brand {
-  padding: 0.5rem 1rem;
-}
-
 .brand-name {
   font-weight: 700;
-  font-size: 1.2rem;
+  font-size: 1.5rem;
   color: var(--secondary);
 }
 
+/* The single shared pill holding Menu / Cart / Orders — this is what
+   carries the border and shadow now, not each link individually. */
+.nav-group {
+  justify-self: center;
+  display: flex;
+  align-items: center;
+  border: 2px solid rgba(175, 172, 172, 0.205);
+  border-radius: 999px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.39),
+    0 3px 8px rgba(0, 0, 0, 0.212);
+  overflow: hidden;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  text-decoration: none;
+  color: inherit;
+  padding: 0.6rem 1.1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.nav-item:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
 .navbar-actions {
+  justify-self: end;
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
 .nav-pill {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  border: 2px solid rgba(175, 172, 172, 0.205);
+  border-radius: 999px;
   gap: 0.4rem;
   padding: 0.5rem 0.9rem;
-  font-size: 0.8rem;
+  font-size: 1rem;
   font-weight: 600;
   color: inherit;
+  background: none;
+  cursor: pointer;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.39),
+    0 3px 8px rgba(0, 0, 0, 0.212);
   transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
@@ -66,4 +104,15 @@
 .navbar-greeting {
   cursor: default;
   font-weight: 500;
+}
+
+@media (max-width: 720px) {
+  .site-header {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 0.75rem;
+  }
+  .brand, .nav-group, .navbar-actions {
+    justify-self: center;
+  }
 }
