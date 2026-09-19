@@ -3,11 +3,11 @@
   top: 0;
   z-index: 50;
   background: none;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
+ display: flex;
   align-items: center;
   padding: 1.5rem;
   width: 100%;
+  justify-content: space-between;
 }
 
 .brand {
