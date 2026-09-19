@@ -111,12 +111,6 @@
   padding: 0 2rem 2rem;
 }
 
-@media (max-width: 640px) {
-  .shop-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
 .shop-card {
   border: none;
   border-radius: 20px;
@@ -170,4 +164,73 @@
   font-family: 'IBM Plex Mono', monospace;
   color: #6b6255;
   font-size: 0.8rem;
+}
+
+/* ===== Responsive breakpoints ===== */
+
+/* Tablets / small laptops — three shop cards get tight at this width,
+   so drop to two per row instead of shrinking each one too much. */
+@media (max-width: 1024px) {
+  .shop-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .menu-hero {
+    padding: 0 1.5rem;
+  }
+}
+
+/* Large phones / small tablets */
+@media (max-width: 720px) {
+  .menu-page .hero {
+    padding: 1rem 1rem 2rem;
+  }
+  .menu-hero {
+    padding: 0 1rem;
+  }
+  .hero-sub {
+    padding: 0 1rem;
+  }
+  .menu-tabs {
+    padding-left: 1rem;
+  }
+  .shop-grid {
+    grid-template-columns: 1fr;
+    padding: 0 1rem 1.5rem;
+  }
+  .product-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  }
+}
+
+/* Small phones */
+@media (max-width: 480px) {
+  .menu-hero {
+    padding: 0 0.5rem;
+    font-size: clamp(1.5rem, 7vw, 2.2rem);
+  }
+  .menu-page .hero-eyebrow {
+    font-size: 0.7rem;
+    padding: 0 0.5rem;
+  }
+  .hero-sub {
+    padding: 0 0.5rem;
+  }
+  .menu-tabs {
+    padding-left: 0.5rem;
+    gap: 0.25rem;
+  }
+  .menu-tab {
+    padding: 0.6rem 0.85rem;
+    font-size: 0.85rem;
+  }
+  .shop-grid {
+    padding: 0 0.75rem 1.25rem;
+    gap: 1rem;
+  }
+  .shop-card {
+    padding: 0.6rem;
+  }
+  .product-grid {
+    grid-template-columns: 1fr;
+  }
 }
