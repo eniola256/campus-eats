@@ -1,21 +1,174 @@
-import { useEffect, useState } from 'react';
-import { api, formatNaira } from '../api.js';
+import { useState } from 'react';
+import { formatNaira } from '../api.js';
 import { useCart } from '../CartContext.jsx';
 import './Menu.css';
 
-// Placeholder shop data — there's only one real shop wired up in the
-// backend right now, so this is a mockup for the "choose a shop" flow
-// until real multi-shop support exists (a shops table, products
-// assigned to a shop, etc). Clicking any card just jumps to the Food
-// tab, which shows the one real menu we have either way.
 const SHOPS = [
-  { id: 1, name: 'Yaba Deli', rating: 4.6, image: '/shop1.png' },
-  { id: 2, name: 'Mama Put Kitchen', rating: 4.3, image: '/shop2.png' },
-  { id: 3, name: 'Campus Grill House', rating: 4.8, image: '/shop3.png' },
+  {
+    id: 1,
+    name: 'Food Affairs (Cocacola)',
+    rating: 4.6,
+    image: '/shop1.png',
+    menu: [
+      { id: 'fa-rice', category: 'Main Meals', name: 'Rice', price_kobo: 30000 },
+      { id: 'fa-beans', category: 'Main Meals', name: 'Beans', price_kobo: 30000 },
+      {
+        id: 'fa-fufu-soup',
+        category: 'Main Meals',
+        name: 'Fufu & Soup',
+        description: 'With any swallow',
+        price_kobo: 120000,
+      },
+      { id: 'fa-spag', category: 'Main Meals', name: 'Spag', priceLabel: 'From ₦200' },
+      { id: 'fa-meat', category: 'Sides', name: 'Meat', price_kobo: 30000 },
+      { id: 'fa-egg', category: 'Sides', name: 'Egg', price_kobo: 30000 },
+      { id: 'fa-pomo', category: 'Sides', name: 'Pomo', price_kobo: 20000 },
+      { id: 'fa-plantain', category: 'Sides', name: 'Plantain', priceLabel: 'From ₦100' },
+    ],
+  },
+
+  {
+    id: 2,
+    name: 'Fuck "U" Spag',
+    rating: 4.3,
+    image: '/shop2.png',
+    menu: [
+      {
+        id: 'fus-basic',
+        category: 'Spaghetti Meals',
+        name: 'Spag + Fish + Takeaway',
+        price_kobo: 120000,
+      },
+      {
+        id: 'fus-fish-egg',
+        category: 'Spaghetti Meals',
+        name: 'Spag + Fish + Egg',
+        price_kobo: 150000,
+      },
+      {
+        id: 'fus-plantain-fish-egg',
+        category: 'Spaghetti Meals',
+        name: 'Spag + Plantain + Fish + Egg',
+        price_kobo: 170000,
+      },
+      {
+        id: 'fus-chicken-spag',
+        category: 'Spaghetti Meals',
+        name: 'Chicken + Spag',
+        description: 'With takeaway',
+        price_kobo: 270000,
+      },
+      {
+        id: 'fus-turkey-spag',
+        category: 'Spaghetti Meals',
+        name: 'Turkey + Spag',
+        description: 'With takeaway',
+        price_kobo: 400000,
+      },
+      {
+        id: 'fus-spag-ala',
+        category: 'Extras',
+        name: 'Spag Ala',
+        price_kobo: 70000,
+      },
+      {
+        id: 'fus-extra-spag',
+        category: 'Extras',
+        name: 'Extra Spag',
+        price_kobo: 50000,
+      },
+      {
+        id: 'fus-plantain',
+        category: 'Extras',
+        name: 'Plantain',
+        description: '5 pieces',
+        price_kobo: 20000,
+      },
+      {
+        id: 'fus-sausage',
+        category: 'Extras',
+        name: 'Sausage',
+        price_kobo: 80000,
+      },
+      {
+        id: 'fus-fish',
+        category: 'Extras',
+        name: 'Fish',
+        priceLabel: '₦500–₦600',
+      },
+      {
+        id: 'fus-egg',
+        category: 'Extras',
+        name: 'Egg',
+        price_kobo: 30000,
+      },
+    ],
+  },
+
+  {
+    id: 3,
+    name: 'Precious Royal Catering (Barwa)',
+    rating: 4.8,
+    image: '/shop3.png',
+    menu: [
+      { id: 'prc-fufu', category: 'Swallows', name: 'Fufu', price_kobo: 30000 },
+      { id: 'prc-eba', category: 'Swallows', name: 'EBA', price_kobo: 20000 },
+      { id: 'prc-semo', category: 'Swallows', name: 'Semo', price_kobo: 30000 },
+      {
+        id: 'prc-pounded-yam',
+        category: 'Swallows',
+        name: 'Pounded Yam',
+        price_kobo: 50000,
+      },
+      {
+        id: 'prc-fish',
+        category: 'Proteins',
+        name: 'Fish',
+        priceLabel: '₦300–₦500',
+      },
+      {
+        id: 'prc-meat',
+        category: 'Proteins',
+        name: 'Meat',
+        priceLabel: '₦200–₦500',
+      },
+      { id: 'prc-pomo', category: 'Sides', name: 'Pomo', price_kobo: 20000 },
+      {
+        id: 'prc-beans',
+        category: 'Main Meals',
+        name: 'Beans',
+        description: 'Per portion',
+        price_kobo: 30000,
+      },
+      {
+        id: 'prc-rice',
+        category: 'Main Meals',
+        name: 'Rice',
+        description: 'Per portion',
+        price_kobo: 30000,
+      },
+      { id: 'prc-egg', category: 'Sides', name: 'Egg', price_kobo: 30000 },
+      {
+        id: 'prc-plantain',
+        category: 'Sides',
+        name: 'Plantain',
+        description: '5 pieces',
+        price_kobo: 20000,
+      },
+      {
+        id: 'prc-spaghetti',
+        category: 'Main Meals',
+        name: 'Spaghetti',
+        description: 'Per portion',
+        price_kobo: 20000,
+      },
+    ],
+  },
 ];
 
 function Stars({ rating }) {
   const full = Math.round(rating);
+
   return (
     <span className="shop-stars">
       {'★'.repeat(full)}
@@ -26,83 +179,119 @@ function Stars({ rating }) {
 }
 
 export default function Menu() {
-  const [view, setView] = useState('shops'); // 'shops' | 'food'
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [selectedShopId, setSelectedShopId] = useState(null);
   const { addItem } = useCart();
 
-  useEffect(() => {
-    api.getProducts()
-      .then((result) => setProducts(Array.isArray(result) ? result : []))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const byCategory = products.reduce((acc, p) => {
-    (acc[p.category] = acc[p.category] || []).push(p);
-    return acc;
-  }, {});
+  const selectedShop = SHOPS.find((shop) => shop.id === selectedShopId);
 
   return (
     <div className="menu-page">
-      {/* Original hero — unchanged, shown above both tabs */}
       <section className="hero">
-        <p className="hero-eyebrow">One shop. One order. Delivered to your gate.</p>
-        <h1 className="menu-hero">Order from the busiest kitchen on campus — without leaving your room.</h1>
-        <p className="hero-sub">Minimum order ₦1,500 · Pay by card or transfer · We walk it to your hostel</p>
+        <p className="hero-eyebrow">
+          One shop. One order. Delivered to your gate.
+        </p>
+
+        <h1 className="menu-hero">
+          Order from the busiest kitchen on campus — without leaving your room.
+        </h1>
+
+        <p className="hero-sub">
+          Minimum order ₦1,500 · Pay by card or transfer · We walk it to your hostel
+        </p>
       </section>
 
-      <div className="menu-tabs">
-        <button
-          className={`menu-tab ${view === 'shops' ? 'active' : ''}`}
-          onClick={() => setView('shops')}
-        >
-          Shops
-        </button>
-        <button
-          className={`menu-tab ${view === 'food' ? 'active' : ''}`}
-          onClick={() => setView('food')}
-        >
-          Food
-        </button>
-      </div>
-
-      {view === 'shops' && (
+      {!selectedShop && (
         <div className="shop-grid">
           {SHOPS.map((shop) => (
-            <button key={shop.id} className="shop-card" onClick={() => setView('food')}>
-              <img src={shop.image} alt={shop.name} className="shop-image" />
+            <button
+              key={shop.id}
+              className="shop-card"
+              onClick={() => setSelectedShopId(shop.id)}
+            >
+              <img
+                src={shop.image}
+                alt={shop.name}
+                className="shop-image"
+              />
+
               <h3 className="shop-name">{shop.name}</h3>
+
               <Stars rating={shop.rating} />
             </button>
           ))}
         </div>
       )}
 
-      {view === 'food' && (
-        <>
-          {loading && <p className="state-msg">Loading the menu…</p>}
-          {error && <p className="state-msg error">Couldn't load the menu: {error}</p>}
+      {selectedShop && (
+        <div className="selected-shop-menu">
+          <div className="selected-shop-header">
+            <button
+              className="back-button"
+              onClick={() => setSelectedShopId(null)}
+            >
+              ← Back to shops
+            </button>
 
-          {!loading && !error && Object.entries(byCategory).map(([category, items]) => (
+            <div>
+              <h2>{selectedShop.name}</h2>
+              <Stars rating={selectedShop.rating} />
+            </div>
+          </div>
+
+          {Object.entries(
+            selectedShop.menu.reduce((acc, item) => {
+              (acc[item.category] = acc[item.category] || []).push(item);
+              return acc;
+            }, {})
+          ).map(([category, items]) => (
             <section key={category} className="menu-section">
               <h2>{category}</h2>
+
               <div className="product-grid">
-                {items.map((p) => (
-                  <div key={p.id} className="product-card">
-                    <div className="product-info">
-                      <h3>{p.name}</h3>
-                      {p.description && <p className="product-desc">{p.description}</p>}
-                      <span className="price">{formatNaira(p.price_kobo)}</span>
+                {items.map((item) => {
+                  const hasFixedPrice =
+                    typeof item.price_kobo === 'number';
+
+                  return (
+                    <div key={item.id} className="product-card">
+                      <div className="product-info">
+                        <h3>{item.name}</h3>
+
+                        {item.description && (
+                          <p className="product-desc">
+                            {item.description}
+                          </p>
+                        )}
+
+                        <span className="price">
+                          {hasFixedPrice
+                            ? formatNaira(item.price_kobo)
+                            : item.priceLabel}
+                        </span>
+                      </div>
+
+                      <button
+                        className="btn-add"
+                        disabled={!hasFixedPrice}
+                        onClick={() => {
+                          if (hasFixedPrice) {
+                            addItem({
+                              ...item,
+                              shopId: selectedShop.id,
+                              shopName: selectedShop.name,
+                            });
+                          }
+                        }}
+                      >
+                        {hasFixedPrice ? 'Add' : 'Select'}
+                      </button>
                     </div>
-                    <button className="btn-add" onClick={() => addItem(p)}>Add</button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           ))}
-        </>
+        </div>
       )}
     </div>
   );

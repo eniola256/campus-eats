@@ -87,3 +87,21 @@
   font-family: 'Space Grotesk', sans-serif;
 }
 
+@media (max-width: 480px) {
+  .landing-page .hero {
+    padding: 1rem 1.25rem 5rem;
+    padding-top: 5rem;
+  }
+
+  .landing-page .hero h1 {
+    font-size: clamp(2.4rem, 11vw, 4.5rem);
+  }
+
+  .landing-cta p {
+    font-size: 1rem;
+  }
+
+  .landing-benefits {
+    margin-top: 1.25rem;
+  }
+}

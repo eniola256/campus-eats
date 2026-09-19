@@ -166,6 +166,41 @@
   font-size: 0.8rem;
 }
 
+.selected-shop-menu {
+  padding: 1.5rem 2rem 2rem;
+}
+
+.selected-shop-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.selected-shop-header h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+}
+
+.back-button {
+  border: 2px solid var(--text, var(--charcoal));
+  background: white;
+  padding: 0.55rem 0.9rem;
+  border-radius: var(--radius);
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.back-button:hover {
+  background: var(--line);
+}
+
+.btn-add:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ===== Responsive breakpoints ===== */
 
 /* Tablets / small laptops — three shop cards get tight at this width,
