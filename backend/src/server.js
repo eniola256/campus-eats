@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 
 const productsRouter = require('./routes/products');
+const shopsRouter = require('./routes/shops');
 const ordersRouter = require('./routes/orders');
 const paymentsRouter = require('./routes/payments');
 const adminRouter = require('./routes/admin');
@@ -34,6 +35,7 @@ app.use(express.json());
 app.get('/health', (req, res) => res.json({ ok: true }));
 
 app.use('/api/products', productsRouter);
+app.use('/api/shops', shopsRouter);
 app.use('/api/orders', orderLimiter, ordersRouter);
 app.use('/api/payments', paymentsRouter);
 app.use('/api/admin', adminRouter);

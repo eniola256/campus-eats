@@ -14,7 +14,6 @@ const VALID_TRANSITIONS = {
   out_for_delivery: ['delivered'],
 };
 
-// POST /api/admin/login
 router.post('/login', async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -36,7 +35,6 @@ router.post('/login', async (req, res, next) => {
   }
 });
 
-// GET /api/admin/orders?status=payment_confirmed — dashboard order list
 router.get('/orders', requireAdmin, async (req, res, next) => {
   try {
     const { status } = req.query;
@@ -53,7 +51,6 @@ router.get('/orders', requireAdmin, async (req, res, next) => {
   }
 });
 
-// GET /api/admin/orders/:id — full order detail incl. items and any refunds owed
 router.get('/orders/:id', requireAdmin, async (req, res, next) => {
   try {
     const { rows: orderRows } = await pool.query(
@@ -76,8 +73,6 @@ router.get('/orders/:id', requireAdmin, async (req, res, next) => {
   }
 });
 
-// GET /api/admin/refunds?status=pending — a running list of refunds owed,
-// across all orders, so nothing gets forgotten.
 router.get('/refunds', requireAdmin, async (req, res, next) => {
   try {
     const { status } = req.query;
@@ -96,7 +91,6 @@ router.get('/refunds', requireAdmin, async (req, res, next) => {
   }
 });
 
-// PATCH /api/admin/orders/:id/status  { status: 'accepted' }
 router.patch('/orders/:id/status', requireAdmin, async (req, res, next) => {
   const client = await pool.connect();
   try {
@@ -142,10 +136,6 @@ router.patch('/orders/:id/status', requireAdmin, async (req, res, next) => {
   }
 });
 
-// PATCH /api/admin/order-items/:id/contact — first step: let the customer
-// know something's wrong and try to reach them (WhatsApp message here;
-// a phone call is on you, outside the app). Doesn't change anything about
-// the order yet — just logs that contact was attempted, and when.
 router.patch('/order-items/:id/contact', requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -173,12 +163,6 @@ router.patch('/order-items/:id/contact', requireAdmin, async (req, res, next) =>
   }
 });
 
-// PATCH /api/admin/order-items/:id/unavailable — second step, after you've
-// tried reaching the customer and waited (10 minutes is your own judgment
-// call, not enforced here). Marks the item unavailable, shrinks the order
-// total, and logs a refund as OWED — it does not attempt any automatic
-// payment-gateway refund. You refund manually via Monnify's dashboard,
-// then mark it as sent from the admin dashboard's refunds list.
 router.patch('/order-items/:id/unavailable', requireAdmin, async (req, res, next) => {
   const client = await pool.connect();
   try {
@@ -229,9 +213,6 @@ router.patch('/order-items/:id/unavailable', requireAdmin, async (req, res, next
   }
 });
 
-// PATCH /api/admin/refunds/:id/mark-refunded — you click this AFTER you've
-// actually sent the money yourself via Monnify's dashboard or bank
-// transfer. This just records that it's done and tells the customer.
 router.patch('/refunds/:id/mark-refunded', requireAdmin, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
@@ -262,11 +243,15 @@ router.patch('/refunds/:id/mark-refunded', requireAdmin, async (req, res, next) 
   }
 });
 
-// --- Product & fee management ---
+// --- Product management (now shop-aware) ---
 
 router.get('/products', requireAdmin, async (req, res, next) => {
   try {
-    const { rows } = await pool.query('SELECT * FROM products ORDER BY category, sort_order');
+    const { shopId } = req.query;
+    const { rows } = await pool.query(
+      `SELECT * FROM products WHERE ($1::int IS NULL OR shop_id = $1) ORDER BY shop_id, category, sort_order`,
+      [shopId || null]
+    );
     res.json(rows);
   } catch (err) {
     next(err);
@@ -275,11 +260,12 @@ router.get('/products', requireAdmin, async (req, res, next) => {
 
 router.post('/products', requireAdmin, async (req, res, next) => {
   try {
-    const { name, category, description, priceKobo, sortOrder } = req.body;
+    const { name, category, description, priceKobo, sortOrder, shopId } = req.body;
+    if (!shopId) return res.status(400).json({ error: 'shopId is required' });
     const { rows } = await pool.query(
-      `INSERT INTO products (name, category, description, price_kobo, sort_order)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [name, category, description || null, priceKobo, sortOrder || 0]
+      `INSERT INTO products (name, category, description, price_kobo, sort_order, shop_id)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [name, category, description || null, priceKobo, sortOrder || 0, shopId]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -289,7 +275,7 @@ router.post('/products', requireAdmin, async (req, res, next) => {
 
 router.patch('/products/:id', requireAdmin, async (req, res, next) => {
   try {
-    const { name, category, description, priceKobo, isAvailable, sortOrder } = req.body;
+    const { name, category, description, priceKobo, isAvailable, sortOrder, shopId } = req.body;
     const { rows } = await pool.query(
       `UPDATE products SET
          name = COALESCE($1, name),
@@ -298,9 +284,10 @@ router.patch('/products/:id', requireAdmin, async (req, res, next) => {
          price_kobo = COALESCE($4, price_kobo),
          is_available = COALESCE($5, is_available),
          sort_order = COALESCE($6, sort_order),
+         shop_id = COALESCE($7, shop_id),
          updated_at = now()
-       WHERE id = $7 RETURNING *`,
-      [name, category, description, priceKobo, isAvailable, sortOrder, req.params.id]
+       WHERE id = $8 RETURNING *`,
+      [name, category, description, priceKobo, isAvailable, sortOrder, shopId, req.params.id]
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
@@ -309,13 +296,59 @@ router.patch('/products/:id', requireAdmin, async (req, res, next) => {
   }
 });
 
-// PATCH /api/admin/fees/pause — pause/resume ordering by toggling every
-// product's availability at once (simple V1 approach).
 router.patch('/ordering/:action(pause|resume)', requireAdmin, async (req, res, next) => {
   try {
     const makeAvailable = req.params.action === 'resume';
     await pool.query('UPDATE products SET is_available = $1', [makeAvailable]);
     res.json({ ok: true, ordering: req.params.action });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// --- Shop management — the whole point of this migration: adding or
+// editing a restaurant is now a form submission, not a code deploy. ---
+
+router.get('/shops', requireAdmin, async (req, res, next) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM shops ORDER BY sort_order, name');
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/shops', requireAdmin, async (req, res, next) => {
+  try {
+    const { name, description, imageUrl, rating, sortOrder } = req.body;
+    if (!name) return res.status(400).json({ error: 'Shop name is required' });
+    const { rows } = await pool.query(
+      `INSERT INTO shops (name, description, image_url, rating, sort_order)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [name, description || null, imageUrl || null, rating || null, sortOrder || 0]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.patch('/shops/:id', requireAdmin, async (req, res, next) => {
+  try {
+    const { name, description, imageUrl, rating, isActive, sortOrder } = req.body;
+    const { rows } = await pool.query(
+      `UPDATE shops SET
+         name = COALESCE($1, name),
+         description = COALESCE($2, description),
+         image_url = COALESCE($3, image_url),
+         rating = COALESCE($4, rating),
+         is_active = COALESCE($5, is_active),
+         sort_order = COALESCE($6, sort_order)
+       WHERE id = $7 RETURNING *`,
+      [name, description, imageUrl, rating, isActive, sortOrder, req.params.id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
   } catch (err) {
     next(err);
   }
