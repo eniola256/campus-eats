@@ -39,22 +39,49 @@
 .product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1rem;
+  gap: 1.25rem;
   margin-top: 1rem;
 }
 .product-card {
-  border: 2px solid var(--text, var(--charcoal));
-  border-radius: var(--radius);
-  padding: 1rem;
+  border: none;
+  border-radius: 18px;
+  padding: 0.75rem;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  gap: 0.6rem;
   background: white;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 8px 20px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.product-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.05),
+    0 12px 24px rgba(0, 0, 0, 0.09);
+}
+.product-image,
+.product-image-placeholder {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  background: var(--line);
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.75rem;
+}
+.product-info {
+  padding: 0 0.2rem;
+  flex: 1;
 }
 .product-card h3 {
   font-size: 1rem;
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 700;
+  margin: 0 0 0.2rem;
 }
 .product-desc {
   font-size: 0.85rem;
@@ -64,18 +91,52 @@
 .price {
   font-weight: 600;
 }
-.btn-add {
-  margin-top: 0.75rem;
-  border: 2px solid var(--text, var(--charcoal));
-  background: var(--accent, var(--mustard));
-  padding: 0.5rem;
-  border-radius: var(--radius);
-  font-weight: 700;
-  cursor: pointer;
-  font-family: 'Space Grotesk', sans-serif;
+.product-actions {
+  padding: 0 0.2rem 0.1rem;
+  display: flex;
+  justify-content: flex-end;
 }
-.btn-add:hover {
-  background: var(--accent-deep, var(--mustard-deep));
+
+.menu-qty-control {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #f2efe6;
+  border-radius: 999px;
+  padding: 0.25rem 0.5rem;
+}
+.menu-qty-control span {
+  min-width: 1rem;
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+}
+.menu-qty-control button {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 1rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.menu-qty-control button:hover {
+  background: var(--line);
+  transform: scale(1.05);
+}
+.menu-qty-control button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+.menu-qty-control button:disabled:hover {
+  background: white;
 }
 
 /* --- Shops / Food tabs --- */
@@ -194,11 +255,6 @@
 
 .back-button:hover {
   background: var(--line);
-}
-
-.btn-add:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
 }
 
 /* ===== Responsive breakpoints ===== */

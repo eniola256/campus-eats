@@ -11,7 +11,8 @@ async function request(path, options = {}) {
 }
 
 export const api = {
-  getProducts: () => request('/products'),
+  getShops: () => request('/shops'),
+  getProducts: (shopId) => request(shopId ? `/products?shopId=${shopId}` : '/products'),
   createOrder: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload) }),
   getOrder: (id, phone) => request(`/orders/${id}?phone=${encodeURIComponent(phone)}`),
   getMyOrders: (sessionToken) =>
