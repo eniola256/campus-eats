@@ -15,23 +15,38 @@ function Stars({ rating }) {
   );
 }
 
-function ProductQty({ product }) {
-  // Renamed the cart's own `items` to `cartItems` here to avoid clashing
-  // with the `items` name already used for "this category's products"
-  // elsewhere in the page.
-  const { items: cartItems, addItem, updateQuantity } = useCart();
+function ProductQty({ product, shopName }) {
+  const { items: cartItems, addItem, switchShopAndAdd, updateQuantity } = useCart();
   const cartItem = cartItems.find((i) => i.product.id === product.id);
   const qty = cartItem ? cartItem.quantity : 0;
 
+  function handleAdd() {
+    const withShop = { ...product, shopName };
+    const added = addItem(withShop);
+    if (!added) {
+      const currentShop = cartItems[0]?.product.shopName || 'a different shop';
+      const confirmed = window.confirm(
+        `Your cart has items from ${currentShop}. Adding this will clear it and start a new order from ${shopName}. Continue?`
+      );
+      if (confirmed) switchShopAndAdd(withShop);
+    }
+  }
+
+  if (qty === 0) {
+    return (
+      <div className="menu-qty-control">
+        <button disabled>−</button>
+        <span>0</span>
+        <button onClick={handleAdd}>+</button>
+      </div>
+    );
+  }
+
   return (
     <div className="menu-qty-control">
-      <button disabled={qty === 0} onClick={() => updateQuantity(product.id, qty - 1)}>
-        −
-      </button>
+      <button onClick={() => updateQuantity(product.id, qty - 1)}>−</button>
       <span>{qty}</span>
-      <button onClick={() => (qty === 0 ? addItem(product) : updateQuantity(product.id, qty + 1))}>
-        +
-      </button>
+      <button onClick={() => updateQuantity(product.id, qty + 1)}>+</button>
     </div>
   );
 }
@@ -131,7 +146,7 @@ export default function Menu() {
                       <span className="price">{formatNaira(p.price_kobo)}</span>
                     </div>
                     <div className="product-actions">
-                      <ProductQty product={p} />
+                      <ProductQty product={p} shopName={selectedShop.name} />
                     </div>
                   </div>
                 ))}

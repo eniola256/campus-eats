@@ -10,7 +10,10 @@ const MONNIFY_CONTRACT_CODE = process.env.MONNIFY_CONTRACT_CODE;
 function monnifyRequest(method, path, body, token) {
   return new Promise((resolve, reject) => {
     const data = body ? JSON.stringify(body) : null;
-    const headers = { 'Content-Type': 'application/json' };
+    const headers = { 
+      'Content-Type': 'application/json',
+      'User-Agent': 'CampusEats/1.0',
+     };
     if (data) headers['Content-Length'] = Buffer.byteLength(data);
     if (token) headers.Authorization = `Bearer ${token}`;
 
@@ -20,6 +23,7 @@ function monnifyRequest(method, path, body, token) {
         let raw = '';
         res.on('data', (chunk) => (raw += chunk));
         res.on('end', () => {
+          console.log('Monnify', method, path, '->', res.statusCode, raw.slice(0, 300));
           try {
             const parsed = JSON.parse(raw);
             if (res.statusCode >= 400) return reject(parsed);

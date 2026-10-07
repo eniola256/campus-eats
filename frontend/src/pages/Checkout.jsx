@@ -8,7 +8,7 @@ import './Checkout.css';
 const MIN_ORDER_KOBO = 150000;
 
 export default function Checkout() {
-  const { items, updateQuantity, subtotalKobo, clearCart } = useCart();
+  const { items, updateQuantity, subtotalKobo, clearCart, shopName } = useCart();
   const { customer } = useCustomerAuth();
   const [form, setForm] = useState({ fullName: '', phone: '', hostel: '', roomOrGate: '' });
   const [submitting, setSubmitting] = useState(false);
@@ -59,6 +59,12 @@ export default function Checkout() {
   return (
     <div className="checkout-page">
       <h1>Your order</h1>
+
+      {shopName && (
+        <p className="note" style={{ marginBottom: '1rem', fontWeight: 700 }}>
+          Ordering from: {shopName}
+        </p>
+      )}
 
       {customer ? (
         <p className="note" style={{ marginBottom: '1rem' }}>

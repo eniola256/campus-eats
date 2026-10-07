@@ -36,7 +36,7 @@ router.post('/', async (req, res, next) => {
 
     const productIds = items.map((i) => i.productId);
     const { rows: products } = await client.query(
-      `SELECT id, name, price_kobo, is_available FROM products WHERE id = ANY($1)`,
+      `SELECT id, name, price_kobo, is_available, shop_id FROM products WHERE id = ANY($1)`,
       [productIds]
     );
     const productMap = new Map(products.map((p) => [p.id, p]));
@@ -60,6 +60,17 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: `Minimum order is ₦${MIN_ORDER_KOBO / 100}` });
     }
 
+    // One shop per order — matches how delivery actually works (one
+    // pickup trip per order). Checked here, server-side, so this can't
+    // be bypassed by calling the API directly even if the frontend cart
+    // somehow let two shops' items through.
+    const shopIds = new Set(lineItems.map((li) => li.product.shop_id).filter((id) => id != null));
+    if (shopIds.size > 1) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'An order can only include items from one shop at a time.' });
+    }
+    const shopId = shopIds.size === 1 ? [...shopIds][0] : null;
+
     const { serviceFeeKobo, deliveryFeeKobo } = await calculateFees(subtotalKobo);
     const totalKobo = subtotalKobo + serviceFeeKobo + deliveryFeeKobo;
     const reference = generateReference();
@@ -67,11 +78,11 @@ router.post('/', async (req, res, next) => {
     const orderResult = await client.query(
       `INSERT INTO orders
         (customer_id, status, subtotal_kobo, service_fee_kobo, delivery_fee_kobo,
-         total_kobo, delivery_hostel, delivery_note, paystack_reference)
-       VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7, $8)
+         total_kobo, delivery_hostel, delivery_note, paystack_reference, shop_id)
+       VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id`,
       [customerId, subtotalKobo, serviceFeeKobo, deliveryFeeKobo, totalKobo,
-       customer.hostel, customer.roomOrGate || null, reference]
+       customer.hostel, customer.roomOrGate || null, reference, shopId]
     );
     const orderId = orderResult.rows[0].id;
 
@@ -117,18 +128,13 @@ router.post('/', async (req, res, next) => {
   }
 });
 
-// GET /api/orders/mine — every order for the logged-in customer, most
-// recent first. This is what powers the "My Orders" page — it's the
-// answer to "once I leave the tracking page, how do I find my order
-// again?" Requires a customer session (phone+password or a confirmed
-// Telegram login), not just knowing a phone number, since this shows
-// their FULL order history, not just one order.
 router.get('/mine', requireCustomer, async (req, res, next) => {
   try {
     const { rows } = await pool.query(
-      `SELECT o.id, o.status, o.total_kobo, o.delivery_hostel, o.created_at
+      `SELECT o.id, o.status, o.total_kobo, o.delivery_hostel, o.created_at, s.name AS shop_name
        FROM orders o
        JOIN customers c ON c.id = o.customer_id
+       LEFT JOIN shops s ON s.id = o.shop_id
        WHERE c.phone = $1
        ORDER BY o.created_at DESC`,
       [req.customerPhone]
@@ -145,8 +151,10 @@ router.get('/:id', async (req, res, next) => {
     if (!phone) return res.status(400).json({ error: 'phone query param required' });
 
     const { rows: orderRows } = await pool.query(
-      `SELECT o.*, c.full_name, c.phone, c.telegram_chat_id FROM orders o
+      `SELECT o.*, c.full_name, c.phone, c.telegram_chat_id, s.name AS shop_name
+       FROM orders o
        JOIN customers c ON c.id = o.customer_id
+       LEFT JOIN shops s ON s.id = o.shop_id
        WHERE o.id = $1 AND c.phone = $2`,
       [req.params.id, phone]
     );

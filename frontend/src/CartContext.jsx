@@ -20,7 +20,14 @@ export function CartProvider({ children }) {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [items]);
 
+  // One shop per cart — mirrors the same rule enforced server-side in
+  // orders.js. Returns true if the item was added, false if the caller
+  // needs to ask "clear cart and switch shops?" first.
   function addItem(product) {
+    const currentShopId = items[0]?.product.shop_id;
+    if (items.length > 0 && currentShopId != null && product.shop_id !== currentShopId) {
+      return false;
+    }
     setItems((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
       if (existing) {
@@ -30,6 +37,13 @@ export function CartProvider({ children }) {
       }
       return [...prev, { product, quantity: 1 }];
     });
+    return true;
+  }
+
+  // Clears the cart, then adds this product — used when the customer
+  // confirms they want to switch shops.
+  function switchShopAndAdd(product) {
+    setItems([{ product, quantity: 1 }]);
   }
 
   function updateQuantity(productId, quantity) {
@@ -49,8 +63,11 @@ export function CartProvider({ children }) {
     [items]
   );
 
+  const shopName = items[0]?.product.shopName || null;
+  const shopId = items[0]?.product.shop_id ?? null;
+
   return (
-    <CartContext.Provider value={{ items, addItem, updateQuantity, clearCart, subtotalKobo }}>
+    <CartContext.Provider value={{ items, addItem, switchShopAndAdd, updateQuantity, clearCart, subtotalKobo, shopName, shopId }}>
       {children}
     </CartContext.Provider>
   );
