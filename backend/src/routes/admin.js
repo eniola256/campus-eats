@@ -40,11 +40,11 @@ router.get('/orders', requireAdmin, async (req, res, next) => {
     const { status } = req.query;
     const { rows } = await pool.query(
       `SELECT o.*, c.full_name, c.phone, c.room_or_gate, s.name AS shop_name
-        FROM orders o
-        JOIN customers c ON c.id = o.customer_id
-        LEFT JOIN shops s ON s.id = o.shop_id
-        WHERE ($1::text IS NULL OR o.status = $1)
-        ORDER BY o.created_at DESC LIMIT 200`
+       FROM orders o
+       JOIN customers c ON c.id = o.customer_id
+       LEFT JOIN shops s ON s.id = o.shop_id
+       WHERE ($1::text IS NULL OR o.status = $1)
+       ORDER BY o.created_at DESC LIMIT 200`,
       [status || null]
     );
     res.json(rows);
@@ -56,8 +56,11 @@ router.get('/orders', requireAdmin, async (req, res, next) => {
 router.get('/orders/:id', requireAdmin, async (req, res, next) => {
   try {
     const { rows: orderRows } = await pool.query(
-      `SELECT o.*, c.full_name, c.phone, c.room_or_gate FROM orders o, s.name AS shop_name
-       JOIN customers c ON c.id = o.customer_id WHERE o.id = $1`,
+      `SELECT o.*, c.full_name, c.phone, c.room_or_gate, s.name AS shop_name
+       FROM orders o
+       JOIN customers c ON c.id = o.customer_id
+       LEFT JOIN shops s ON s.id = o.shop_id
+       WHERE o.id = $1`,
       [req.params.id]
     );
     if (orderRows.length === 0) return res.status(404).json({ error: 'Not found' });

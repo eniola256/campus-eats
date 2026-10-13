@@ -29,12 +29,15 @@ export default function PasswordInput({ value, onChange, minLength, required, di
           background: 'none',
           border: 'none',
           cursor: 'pointer',
-          fontSize: '1.1rem',
-          lineHeight: 1,
+          display: 'flex',
+          alignItems: 'center',
           padding: 0,
+          color: 'inherit',
         }}
       >
-        {visible ? '🙈' : '👁️'}
+        <span className="material-symbols-outlined" style={{ fontSize: '1.3rem' }}>
+          {visible ? 'visibility_off' : 'visibility'}
+        </span>
       </button>
     </div>
   );
