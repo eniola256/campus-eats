@@ -22,7 +22,7 @@ function OrderRow({ order, phone }) {
     <Link to={`/track/${order.id}/${encodeURIComponent(phone)}`} className="queue-row" style={{ textDecoration: 'none', color: 'inherit', marginBottom: '0.5rem' }}>
       <div>
         <strong>Order #{order.id}</strong>
-        <p className="queue-meta">{date} · {order.delivery_hostel}</p>
+        <p className="queue-meta">{order.shop_name ? `${order.shop_name} · ` : ''}{date} · {order.delivery_hostel}</p>
       </div>
       <div style={{ textAlign: 'right' }}>
         <span className="status-badge">{STATUS_LABELS[order.status] || order.status}</span>

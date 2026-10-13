@@ -94,7 +94,8 @@ export default function AdminDashboard() {
             <li key={o.id} className={`queue-row ${selected?.order.id === o.id ? 'active' : ''}`} onClick={() => openOrder(o.id)}>
               <div>
                 <strong>#{o.id} · {o.full_name}</strong>
-                <p className="queue-meta">{o.hostel || o.delivery_hostel} · {o.phone}</p>
+                  <p className="queue-meta" style={{ fontWeight: 700 }}>Buy from: {o.shop_name || 'Unknown shop'}</p>
+                  <p className="queue-meta">{o.hostel || o.delivery_hostel} · {o.phone}</p>
               </div>
               <span className={`status-badge status-${o.status}`}>{o.status.replace(/_/g, ' ')}</span>
             </li>
@@ -104,6 +105,7 @@ export default function AdminDashboard() {
         {selected && (
           <div className="order-detail">
             <h2>Order #{selected.order.id}</h2>
+            <p className="queue-meta" style={{ fontWeight: 700 }}>Buy from: {selected.order.shop_name || 'Unknown shop'}</p>
             <p className="queue-meta">{selected.order.full_name} · {selected.order.phone}</p>
             <p className="queue-meta">Deliver to: {selected.order.delivery_hostel} {selected.order.room_or_gate}</p>
 

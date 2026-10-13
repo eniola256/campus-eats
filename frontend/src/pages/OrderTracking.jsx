@@ -73,6 +73,7 @@ export default function OrderTracking() {
         <div className="ticket-notch" />
         <p className="ticket-eyebrow">Order #{order.id}</p>
         <h1>{STEP_LABELS[order.status] || order.status}</h1>
+        {order.shop_name && <p className="ticket-meta">From {order.shop_name}</p>}
 
         {order.status === 'cancelled' && (
           <p className="state-msg error">This order was cancelled.</p>
