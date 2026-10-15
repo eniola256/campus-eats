@@ -23,6 +23,65 @@ function minutesAgo(isoString) {
   return Math.max(0, Math.floor(diffMs / 60000));
 }
 
+// Open/close switch for the whole store. While closed, customers see a
+// "we're closed" screen and the server refuses new orders; orders already
+// paid for carry on as normal.
+function StoreControl({ token }) {
+  const [store, setStore] = useState(null);
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    api.getStoreStatus()
+      .then((s) => {
+        setStore(s);
+        if (!s.open) setMessage(s.message);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function setOpen(open) {
+    if (!open && !window.confirm('Close the store? Customers won\'t be able to place new orders.')) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setStore(await api.adminSetStore(token, open, open ? undefined : message.trim()));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!store) return null;
+
+  return (
+    <div className={`store-control ${store.open ? 'is-open' : 'is-closed'}`}>
+      <div>
+        <strong>{store.open ? 'Store is open' : 'Store is closed'}</strong>
+        <p className="queue-meta">
+          {store.open ? 'Customers can place orders.' : `Customers see: "${store.message}"`}
+        </p>
+      </div>
+      {store.open && (
+        <input
+          className="store-message"
+          type="text"
+          maxLength={200}
+          placeholder="Message for customers while closed (optional)"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+        />
+      )}
+      <button className={store.open ? 'btn-secondary btn-danger' : 'btn-primary'} onClick={() => setOpen(!store.open)} disabled={busy}>
+        {store.open ? 'Close store' : 'Open store'}
+      </button>
+      {error && <span className="admin-msg error">{error}</span>}
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const token = sessionStorage.getItem('ce_admin_token');
@@ -107,10 +166,13 @@ export default function AdminDashboard() {
       <div className="admin-topbar">
         <h1>Orders</h1>
         <div className="admin-topbar-actions">
+          <button className="btn-secondary" onClick={() => navigate('/admin/history')}>History</button>
           <button className="btn-secondary" onClick={() => navigate('/admin/menu')}>Menu &amp; shops</button>
           <button className="btn-secondary" onClick={logout}>Log out</button>
         </div>
       </div>
+
+      <StoreControl token={token} />
 
       {pendingRefunds.length > 0 && (
         <div style={{ marginBottom: '1.25rem' }}>
