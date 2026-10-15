@@ -61,18 +61,9 @@ a{
 .ticket-total { display: flex; justify-content: space-between; font-weight: 700; font-size: 1.1rem; margin-top: 0.25rem; }
 .ticket-meta { font-size: 0.8rem; color: #6b6255; margin-top: 1rem; font-family: 'Space Grotesk', sans-serif; }
 
-/* Admin */
-.admin-login { display: flex; justify-content: center; padding: 3rem 1rem; }
-.admin-dashboard { max-width: 1000px; margin: 0 auto; padding: 2rem 1.25rem; }
-.admin-topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
-.admin-layout { display: grid; grid-template-columns: 1fr 1.2fr; gap: 1.5rem; }
-.order-queue { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+/* Order rows (shared: My orders page and the admin queue).
+   The admin-only layout rules now live in pages/Admin.css. */
 .queue-row { border: 2px solid var(--charcoal); border-radius: var(--radius); padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: white; }
 .queue-row.active { background: var(--mustard); }
 .queue-meta { font-size: 0.75rem; color: #6b6255; margin: 0.2rem 0 0; }
 .status-badge { font-size: 0.7rem; text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 999px; background: var(--teal); color: white; white-space: nowrap; }
-.order-detail { border: 2px solid var(--charcoal); border-radius: var(--radius); padding: 1.25rem; background: white; height: fit-content; }
-
-@media (max-width: 720px) {
-  .admin-layout { grid-template-columns: 1fr; }
-}

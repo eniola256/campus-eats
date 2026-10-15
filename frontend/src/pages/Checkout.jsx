@@ -13,6 +13,7 @@ export default function Checkout() {
   const [form, setForm] = useState({ fullName: '', phone: '', hostel: '', roomOrGate: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [fees, setFees] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,6 +28,30 @@ export default function Checkout() {
   }, [customer]);
 
   const belowMin = subtotalKobo > 0 && subtotalKobo < MIN_ORDER_KOBO;
+
+  // Ask the server for the fees on this subtotal, so the cart shows exactly
+  // what the order will charge. Each result is tagged with the subtotal it
+  // was fetched for, so a slow response for an old cart is never displayed.
+  useEffect(() => {
+    if (subtotalKobo < MIN_ORDER_KOBO) {
+      setFees(null);
+      return undefined;
+    }
+    let cancelled = false;
+    api.getFeeQuote(subtotalKobo)
+      .then((f) => { if (!cancelled) setFees({ ...f, forSubtotal: subtotalKobo }); })
+      .catch(() => { if (!cancelled) setFees(null); });
+    return () => { cancelled = true; };
+  }, [subtotalKobo]);
+
+  const feesReady = fees && fees.forSubtotal === subtotalKobo;
+  const totalKobo = feesReady
+    ? subtotalKobo + fees.serviceFeeKobo + fees.deliveryFeeKobo + fees.takeawayFeeKobo
+    : null;
+
+  function handleClearAll() {
+    if (window.confirm('Remove all items from your cart?')) clearCart();
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -89,14 +114,50 @@ export default function Checkout() {
                 <button type="button" onClick={() => updateQuantity(i.product.id, i.quantity + 1)}>+</button>
               </div>
               <span className="cart-line-total">{formatNaira(i.product.price_kobo * i.quantity)}</span>
+              <button
+                type="button"
+                onClick={() => updateQuantity(i.product.id, 0)}
+                aria-label={`Remove ${i.product.name} from cart`}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: 0, color: 'var(--error)' }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: '1.3rem' }}>delete</span>
+              </button>
             </li>
           ))}
         </ul>
       )}
 
+      {items.length > 0 && (
+        <button
+          type="button"
+          onClick={handleClearAll}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--error)', fontWeight: 700, padding: '0.5rem 0', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '1.2rem' }}>delete_sweep</span>
+          Clear cart
+        </button>
+      )}
+
       <div className="totals">
         <div className="totals-row"><span>Subtotal</span><span>{formatNaira(subtotalKobo)}</span></div>
-        <p className="totals-note">Service fee and ₦300 delivery fee are calculated at payment.</p>
+
+        {feesReady && (
+          <>
+            <div className="totals-row"><span>Service fee</span><span>{formatNaira(fees.serviceFeeKobo)}</span></div>
+            <div className="totals-row"><span>Delivery fee</span><span>{formatNaira(fees.deliveryFeeKobo)}</span></div>
+            <div className="totals-row"><span>Takeaway fee</span><span>{formatNaira(fees.takeawayFeeKobo)}</span></div>
+            <div className="totals-row" style={{ fontWeight: 700 }}>
+              <span>Total</span><span>{formatNaira(totalKobo)}</span>
+            </div>
+          </>
+        )}
+
+        {!feesReady && subtotalKobo >= MIN_ORDER_KOBO && (
+          <p className="totals-note">Calculating fees…</p>
+        )}
+        {!feesReady && subtotalKobo < MIN_ORDER_KOBO && items.length > 0 && (
+          <p className="totals-note">Service, delivery and takeaway fees are added once you reach the minimum order.</p>
+        )}
         {belowMin && <p className="state-msg error">Minimum order is {formatNaira(MIN_ORDER_KOBO)}.</p>}
       </div>
 
@@ -118,7 +179,11 @@ export default function Checkout() {
         {error && <p className="state-msg error">{error}</p>}
 
         <button type="submit" className="btn-primary" disabled={submitting || items.length === 0}>
-          {submitting ? 'Redirecting to payment…' : 'Pay with Monnify'}
+          {submitting
+            ? 'Redirecting to payment…'
+            : feesReady
+              ? `Pay ${formatNaira(totalKobo)} with Monnify`
+              : 'Pay with Monnify'}
         </button>
       </form>
     </div>

@@ -15,7 +15,17 @@ const TEMPLATES = {
   out_for_delivery: (o) => `Your order #${o.orderId} is on its way to ${o.hostel}!`,
   order_arrived: (o) => `We're outside! Please come out to collect order #${o.orderId} at ${o.hostel}.`,
   order_delivered: (o) => `Order #${o.orderId} delivered. Enjoy your food! Reply if anything was off.`,
+  order_cancelled: (o) => `Your order #${o.orderId} has been cancelled. A refund of ₦${o.amount} will be sent to you shortly.`,
   telegram_connected: () => `You're connected! Order updates for Campus Eats will show up right here from now on.`,
+
+  // Sent to the admin (you), not the customer — see notifyAdmin below.
+  new_paid_order: (o) =>
+    `New paid order #${o.orderId}\n` +
+    `Buy from: ${o.shopName}\n` +
+    `Deliver to: ${o.hostel}\n` +
+    `Customer: ${o.customerName} (${o.phone})\n\n` +
+    `${o.itemsText}\n\n` +
+    `Total: ₦${o.total}`,
 };
 
 function sendTelegramMessage(chatId, text) {
@@ -80,4 +90,10 @@ async function notify(template, chatId, data) {
   }
 }
 
-module.exports = { notify, sendTelegramMessage, TEMPLATES };
+// Same as notify, but the recipient is the admin chat (ADMIN_TELEGRAM_CHAT_ID),
+// the same chat customer replies are forwarded to. Like notify, it never throws.
+function notifyAdmin(template, data) {
+  return notify(template, process.env.ADMIN_TELEGRAM_CHAT_ID, data);
+}
+
+module.exports = { notify, notifyAdmin, sendTelegramMessage, TEMPLATES };

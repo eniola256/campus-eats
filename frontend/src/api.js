@@ -13,6 +13,8 @@ async function request(path, options = {}) {
 export const api = {
   getShops: () => request('/shops'),
   getProducts: (shopId) => request(shopId ? `/products?shopId=${shopId}` : '/products'),
+  getStoreStatus: () => request('/shops/status'),
+  getFeeQuote: (subtotalKobo) => request(`/orders/quote?subtotal=${subtotalKobo}`),
   createOrder: (payload) => request('/orders', { method: 'POST', body: JSON.stringify(payload) }),
   getOrder: (id, phone) => request(`/orders/${id}?phone=${encodeURIComponent(phone)}`),
   getMyOrders: (sessionToken) =>
@@ -41,6 +43,21 @@ export const api = {
     request(`/admin/orders/${id}/status`, {
       method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }),
     }),
+  adminGetHistory: (token, { from, to, status }) => {
+    const query = new URLSearchParams();
+    if (from) query.set('from', from);
+    if (to) query.set('to', to);
+    if (status) query.set('status', status);
+    return request(`/admin/history?${query.toString()}`, { headers: { Authorization: `Bearer ${token}` } });
+  },
+  adminSetStore: (token, open, message) =>
+    request('/admin/store', {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ open, message }),
+    }),
+  adminCancelOrder: (token, id) =>
+    request(`/admin/orders/${id}/cancel`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}` },
+    }),
   adminContactCustomer: (token, itemId) =>
     request(`/admin/order-items/${itemId}/contact`, {
       method: 'PATCH', headers: { Authorization: `Bearer ${token}` },
@@ -55,8 +72,22 @@ export const api = {
     request(`/admin/refunds/${refundId}/mark-refunded`, {
       method: 'PATCH', headers: { Authorization: `Bearer ${token}` },
     }),
-  adminGetProducts: (token) =>
-    request('/admin/products', { headers: { Authorization: `Bearer ${token}` } }),
+  adminGetShops: (token) =>
+    request('/admin/shops', { headers: { Authorization: `Bearer ${token}` } }),
+  adminCreateShop: (token, payload) =>
+    request('/admin/shops', {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(payload),
+    }),
+  adminUpdateShop: (token, id, payload) =>
+    request(`/admin/shops/${id}`, {
+      method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(payload),
+    }),
+  adminGetProducts: (token, shopId) =>
+    request(`/admin/products${shopId ? `?shopId=${shopId}` : ''}`, { headers: { Authorization: `Bearer ${token}` } }),
+  adminCreateProduct: (token, payload) =>
+    request('/admin/products', {
+      method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(payload),
+    }),
   adminUpdateProduct: (token, id, payload) =>
     request(`/admin/products/${id}`, {
       method: 'PATCH', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(payload),

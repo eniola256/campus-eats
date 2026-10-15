@@ -4,15 +4,22 @@ const jwt = require('jsonwebtoken');
 const pool = require('../db/pool');
 const { requireAdmin } = require('../middleware/auth');
 const { notify } = require('../services/telegram');
+const { getStoreStatus, setStoreStatus } = require('../services/storeStatus');
 
 const router = express.Router();
 
+// 'cancelled' is deliberately not here: cancelling must go through
+// PATCH /orders/:id/cancel below, which also records the refund owed.
 const VALID_TRANSITIONS = {
-  payment_confirmed: ['accepted', 'cancelled'],
-  accepted: ['shopping', 'cancelled'],
-  shopping: ['out_for_delivery', 'cancelled'],
+  payment_confirmed: ['accepted'],
+  accepted: ['shopping'],
+  shopping: ['out_for_delivery'],
   out_for_delivery: ['delivered'],
 };
+
+// Statuses an order can still be cancelled from (it's paid, but not yet
+// out for delivery).
+const CANCELLABLE = ['payment_confirmed', 'accepted', 'shopping'];
 
 router.post('/login', async (req, res, next) => {
   try {
@@ -78,6 +85,70 @@ router.get('/orders/:id', requireAdmin, async (req, res, next) => {
   }
 });
 
+// Order history: every order, any status, optionally filtered by status and
+// by date range. Dates are whole days in Lagos time, both ends included.
+// The summary counts the whole filter; the list itself stops at 200 rows.
+router.get('/history', requireAdmin, async (req, res, next) => {
+  try {
+    const { from, to, status } = req.query;
+    const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+    if ((from && !isDate(from)) || (to && !isDate(to))) {
+      return res.status(400).json({ error: 'Dates must look like 2026-10-16' });
+    }
+
+    const params = [status || null, from || null, to || null];
+    const where = `WHERE ($1::text IS NULL OR o.status = $1)
+        AND ($2::date IS NULL OR o.created_at >= (($2::date)::timestamp AT TIME ZONE 'Africa/Lagos'))
+        AND ($3::date IS NULL OR o.created_at < ((($3::date + 1))::timestamp AT TIME ZONE 'Africa/Lagos'))`;
+
+    const { rows: orders } = await pool.query(
+      `SELECT o.id, o.status, o.total_kobo, o.created_at, o.delivery_hostel,
+              c.full_name, c.phone, s.name AS shop_name
+       FROM orders o
+       JOIN customers c ON c.id = o.customer_id
+       LEFT JOIN shops s ON s.id = o.shop_id
+       ${where}
+       ORDER BY o.created_at DESC LIMIT 200`,
+      params
+    );
+    const { rows: summaryRows } = await pool.query(
+      `SELECT count(*)::int AS total,
+              (count(*) FILTER (WHERE o.status = 'delivered'))::int AS delivered,
+              (count(*) FILTER (WHERE o.status = 'cancelled'))::int AS cancelled,
+              COALESCE(sum(o.total_kobo) FILTER (WHERE o.status = 'delivered'), 0)::bigint AS delivered_kobo
+       FROM orders o
+       ${where}`,
+      params
+    );
+    const s = summaryRows[0];
+    res.json({
+      orders,
+      summary: {
+        total: s.total,
+        delivered: s.delivered,
+        cancelled: s.cancelled,
+        deliveredKobo: Number(s.delivered_kobo),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Open or close the store. Closing can carry a message customers will see.
+router.patch('/store', requireAdmin, async (req, res, next) => {
+  try {
+    const { open, message } = req.body;
+    if (typeof open !== 'boolean') {
+      return res.status(400).json({ error: 'open must be true or false' });
+    }
+    await setStoreStatus(open, typeof message === 'string' ? message.trim().slice(0, 200) : undefined);
+    res.json(await getStoreStatus());
+  } catch (err) {
+    next(err);
+  }
+});
+
 router.get('/refunds', requireAdmin, async (req, res, next) => {
   try {
     const { status } = req.query;
@@ -131,6 +202,61 @@ router.patch('/orders/:id/status', requireAdmin, async (req, res, next) => {
     } else if (newStatus === 'delivered') {
       await notify('order_delivered', order.telegram_chat_id, { orderId: order.id });
     }
+
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    next(err);
+  } finally {
+    client.release();
+  }
+});
+
+// Cancel a paid order and record the refund owed for whatever is still
+// unrefunded. total_kobo already excludes items refunded as unavailable
+// (that route subtracts them), so refunding total_kobo can't double-refund.
+router.patch('/orders/:id/cancel', requireAdmin, async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      `SELECT o.id, o.status, o.total_kobo, c.telegram_chat_id
+       FROM orders o
+       JOIN customers c ON c.id = o.customer_id
+       WHERE o.id = $1 FOR UPDATE OF o`,
+      [req.params.id]
+    );
+    if (rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Not found' });
+    }
+    const order = rows[0];
+    if (!CANCELLABLE.includes(order.status)) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: `Cannot cancel an order that is ${order.status.replace(/_/g, ' ')}` });
+    }
+
+    await client.query(`UPDATE orders SET status = 'cancelled', updated_at = now() WHERE id = $1`, [order.id]);
+    await client.query(
+      `INSERT INTO order_status_history (order_id, old_status, new_status, changed_by, note)
+       VALUES ($1, $2, 'cancelled', $3, 'Cancelled by admin')`,
+      [order.id, order.status, req.admin.id]
+    );
+    if (order.total_kobo > 0) {
+      await client.query(
+        `INSERT INTO refunds (order_id, order_item_id, amount_kobo, reason, status, processed_by)
+         VALUES ($1, NULL, $2, 'order_cancelled', 'pending', $3)`,
+        [order.id, order.total_kobo, req.admin.id]
+      );
+    }
+    await client.query('COMMIT');
+
+    // Tell the customer (notify skips customers without Telegram and never throws).
+    await notify('order_cancelled', order.telegram_chat_id, {
+      orderId: order.id,
+      amount: (order.total_kobo / 100).toLocaleString(),
+    });
 
     res.json({ ok: true });
   } catch (err) {
@@ -263,14 +389,22 @@ router.get('/products', requireAdmin, async (req, res, next) => {
   }
 });
 
+const isBlank = (v) => !v || !String(v).trim();
+const isValidPriceKobo = (v) => Number.isInteger(v) && v >= 0;
+
 router.post('/products', requireAdmin, async (req, res, next) => {
   try {
-    const { name, category, description, priceKobo, sortOrder, shopId } = req.body;
+    const { name, category, description, imageUrl, priceKobo, sortOrder, shopId } = req.body;
     if (!shopId) return res.status(400).json({ error: 'shopId is required' });
+    if (isBlank(name)) return res.status(400).json({ error: 'Item name is required' });
+    if (isBlank(category)) return res.status(400).json({ error: 'Category is required' });
+    if (!isValidPriceKobo(priceKobo)) {
+      return res.status(400).json({ error: 'Price must be a whole number of kobo, 0 or more' });
+    }
     const { rows } = await pool.query(
-      `INSERT INTO products (name, category, description, price_kobo, sort_order, shop_id)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [name, category, description || null, priceKobo, sortOrder || 0, shopId]
+      `INSERT INTO products (name, category, description, image_url, price_kobo, sort_order, shop_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [name.trim(), category.trim(), description || null, imageUrl || null, priceKobo, sortOrder || 0, shopId]
     );
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -278,21 +412,47 @@ router.post('/products', requireAdmin, async (req, res, next) => {
   }
 });
 
+// Only the fields present in the request body are updated, and '' clears a
+// field (stored as NULL), same as the shop update. Column names come from
+// this fixed list, never from the request.
+const PRODUCT_FIELDS = {
+  name: 'name',
+  category: 'category',
+  description: 'description',
+  imageUrl: 'image_url',
+  priceKobo: 'price_kobo',
+  isAvailable: 'is_available',
+  sortOrder: 'sort_order',
+  shopId: 'shop_id',
+};
+
 router.patch('/products/:id', requireAdmin, async (req, res, next) => {
   try {
-    const { name, category, description, priceKobo, isAvailable, sortOrder, shopId } = req.body;
+    const body = req.body;
+    if (body.name !== undefined && isBlank(body.name)) {
+      return res.status(400).json({ error: 'Item name cannot be empty' });
+    }
+    if (body.category !== undefined && isBlank(body.category)) {
+      return res.status(400).json({ error: 'Category cannot be empty' });
+    }
+    if (body.priceKobo !== undefined && !isValidPriceKobo(body.priceKobo)) {
+      return res.status(400).json({ error: 'Price must be a whole number of kobo, 0 or more' });
+    }
+
+    const sets = [];
+    const values = [];
+    for (const [key, column] of Object.entries(PRODUCT_FIELDS)) {
+      if (body[key] === undefined) continue;
+      values.push(body[key] === '' ? null : body[key]);
+      sets.push(`${column} = $${values.length}`);
+    }
+    if (sets.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+    sets.push('updated_at = now()');
+
+    values.push(req.params.id);
     const { rows } = await pool.query(
-      `UPDATE products SET
-         name = COALESCE($1, name),
-         category = COALESCE($2, category),
-         description = COALESCE($3, description),
-         price_kobo = COALESCE($4, price_kobo),
-         is_available = COALESCE($5, is_available),
-         sort_order = COALESCE($6, sort_order),
-         shop_id = COALESCE($7, shop_id),
-         updated_at = now()
-       WHERE id = $8 RETURNING *`,
-      [name, category, description, priceKobo, isAvailable, sortOrder, shopId, req.params.id]
+      `UPDATE products SET ${sets.join(', ')} WHERE id = $${values.length} RETURNING *`,
+      values
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
@@ -338,19 +498,37 @@ router.post('/shops', requireAdmin, async (req, res, next) => {
   }
 });
 
+// Only the fields present in the request body are updated, and '' clears a
+// field (stored as NULL). The old COALESCE version could never clear one.
+// Column names come from this fixed list, never from the request.
+const SHOP_FIELDS = {
+  name: 'name',
+  description: 'description',
+  imageUrl: 'image_url',
+  rating: 'rating',
+  isActive: 'is_active',
+  sortOrder: 'sort_order',
+};
+
 router.patch('/shops/:id', requireAdmin, async (req, res, next) => {
   try {
-    const { name, description, imageUrl, rating, isActive, sortOrder } = req.body;
+    if (req.body.name !== undefined && !String(req.body.name).trim()) {
+      return res.status(400).json({ error: 'Shop name cannot be empty' });
+    }
+
+    const sets = [];
+    const values = [];
+    for (const [key, column] of Object.entries(SHOP_FIELDS)) {
+      if (req.body[key] === undefined) continue;
+      values.push(req.body[key] === '' ? null : req.body[key]);
+      sets.push(`${column} = $${values.length}`);
+    }
+    if (sets.length === 0) return res.status(400).json({ error: 'Nothing to update' });
+
+    values.push(req.params.id);
     const { rows } = await pool.query(
-      `UPDATE shops SET
-         name = COALESCE($1, name),
-         description = COALESCE($2, description),
-         image_url = COALESCE($3, image_url),
-         rating = COALESCE($4, rating),
-         is_active = COALESCE($5, is_active),
-         sort_order = COALESCE($6, sort_order)
-       WHERE id = $7 RETURNING *`,
-      [name, description, imageUrl, rating, isActive, sortOrder, req.params.id]
+      `UPDATE shops SET ${sets.join(', ')} WHERE id = $${values.length} RETURNING *`,
+      values
     );
     if (rows.length === 0) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);

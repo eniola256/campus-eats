@@ -1,116 +1,152 @@
 const express = require('express');
-const crypto = require('crypto');
 const pool = require('../db/pool');
-const { sendTelegramMessage, TEMPLATES } = require('../services/telegram');
+const { verifyTransaction, isValidWebhookSignature } = require('../services/monnify');
+const { notify, notifyAdmin } = require('../services/telegram');
 
 const router = express.Router();
-const SESSION_EXPIRY_DAYS = 30;
+
+// Tell the admin a paid order just arrived. Runs after the payment is
+// already saved, and swallows its own errors, so a Telegram or query
+// problem can never undo or fail a payment confirmation.
+async function pingAdminNewOrder(order) {
+  try {
+    const { rows: shopRows } = await pool.query(
+      `SELECT s.name FROM orders o LEFT JOIN shops s ON s.id = o.shop_id WHERE o.id = $1`,
+      [order.id]
+    );
+    const { rows: items } = await pool.query(
+      `SELECT quantity, product_name FROM order_items WHERE order_id = $1 ORDER BY id`,
+      [order.id]
+    );
+    await notifyAdmin('new_paid_order', {
+      orderId: order.id,
+      shopName: shopRows[0]?.name || 'Unknown shop',
+      hostel: order.delivery_hostel,
+      customerName: order.full_name,
+      phone: order.phone,
+      itemsText: items.map((i) => `${i.quantity}× ${i.product_name}`).join('\n'),
+      total: (order.total_kobo / 100).toLocaleString(),
+    });
+  } catch (err) {
+    console.error('Admin new-order ping failed:', err);
+  }
+}
+
+async function confirmPaymentByReference(reference, rawPayload) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows: orderRows } = await client.query(
+      `SELECT o.id, o.status, o.total_kobo, o.delivery_hostel, c.full_name, c.phone, c.telegram_chat_id
+       FROM orders o JOIN customers c ON c.id = o.customer_id
+       WHERE o.paystack_reference = $1
+       FOR UPDATE`,
+      [reference]
+    );
+    if (orderRows.length === 0) {
+      await client.query('ROLLBACK');
+      return { ok: false, reason: 'order_not_found' };
+    }
+    const order = orderRows[0];
+
+    const { rows: existingPayment } = await client.query(
+      `SELECT id FROM payments WHERE paystack_reference = $1 AND status = 'success'`,
+      [reference]
+    );
+    if (existingPayment.length > 0 || order.status !== 'pending_payment') {
+      await client.query('ROLLBACK');
+      return { ok: true, alreadyProcessed: true };
+    }
+
+    await client.query(
+      `INSERT INTO payments (order_id, paystack_reference, amount_kobo, status, raw_payload, verified_at)
+       VALUES ($1, $2, $3, 'success', $4, now())
+       ON CONFLICT (paystack_reference) DO UPDATE SET status = 'success', verified_at = now()`,
+      [order.id, reference, order.total_kobo, rawPayload || {}]
+    );
+
+    await client.query(
+      `UPDATE orders SET status = 'payment_confirmed', updated_at = now() WHERE id = $1`,
+      [order.id]
+    );
+    await client.query(
+      `INSERT INTO order_status_history (order_id, old_status, new_status, note)
+       VALUES ($1, 'pending_payment', 'payment_confirmed', 'Monnify payment verified')`,
+      [order.id]
+    );
+
+    await client.query('COMMIT');
+
+    await notify('payment_confirmed', order.telegram_chat_id, {
+      orderId: order.id,
+      total: (order.total_kobo / 100).toLocaleString(),
+    });
+
+    // Only reached the first time an order is confirmed: a repeat call
+    // (webhook after verify, or the reverse) returns early above as
+    // alreadyProcessed, so the admin gets exactly one ping per order.
+    await pingAdminNewOrder(order);
+
+    return { ok: true, orderId: order.id };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+router.get('/verify/:reference', async (req, res, next) => {
+  try {
+    const result = await verifyTransaction(req.params.reference);
+    console.log(`Verify check for ${req.params.reference}: paymentStatus=${result?.paymentStatus}`);
+    if (result?.paymentStatus !== 'PAID') {
+      const updateResult = await pool.query(
+        `UPDATE orders SET status = 'payment_failed', updated_at = now()
+         WHERE paystack_reference = $1 AND status = 'pending_payment'
+         RETURNING id`,
+        [req.params.reference]
+      );
+      console.log(`Marked payment_failed for ${req.params.reference}, rows updated: ${updateResult.rowCount}`);
+      return res.status(400).json({ ok: false, status: result?.paymentStatus });
+    }
+    const outcome = await confirmPaymentByReference(req.params.reference, result);
+    res.json(outcome);
+  } catch (err) {
+    console.error(`Verify check FAILED for ${req.params.reference}:`, err.message || err);
+    next(err);
+  }
+});
 
 router.post('/webhook', async (req, res) => {
   try {
-    console.log('Telegram webhook hit. Raw body:', JSON.stringify(req.body));
-
-    const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-    if (expectedSecret && req.headers['x-telegram-bot-api-secret-token'] !== expectedSecret) {
-      console.log('Telegram webhook rejected: secret mismatch');
-      return res.sendStatus(401);
+    const signature = req.headers['monnify-signature'];
+    const isProduction = process.env.MONNIFY_ENV === 'live';
+    if (isProduction && !isValidWebhookSignature(req.body, signature)) {
+      return res.status(401).send('Invalid signature');
     }
 
-    const update = req.body;
-    const message = update?.message;
-    const text = message?.text || '';
-    const chatId = message?.chat?.id;
-    const telegramFirstName = message?.from?.first_name || 'Telegram user';
+    const event = JSON.parse(req.body.toString('utf8'));
+    console.log('Monnify webhook received:', JSON.stringify(event));
 
-    console.log(`Telegram parsed: text="${text}" chatId=${chatId}`);
-
-    if (text.startsWith('/start') && chatId) {
-      const payload = text.split(' ')[1] || '';
-      console.log(`Telegram /start payload: "${payload}"`);
-
-      if (payload.startsWith('connect_')) {
-        const phone = payload.slice('connect_'.length);
-        const { rowCount } = await pool.query(
-          `UPDATE customers SET telegram_chat_id = $1 WHERE phone = $2`,
-          [chatId, phone]
-        );
-        console.log(`connect_ matched phone=${phone}, rows updated: ${rowCount}`);
-        const sendResult = await sendTelegramMessage(
-          chatId,
-          rowCount > 0
-            ? TEMPLATES.telegram_connected()
-            : "We couldn't match this to an order yet — try tapping the link from your order tracking page again."
-        );
-        console.log('Telegram sendMessage result:', JSON.stringify(sendResult));
-      } else if (payload.startsWith('login_')) {
-        const loginToken = payload.slice('login_'.length);
-
-        const { rows } = await pool.query(
-          `SELECT * FROM login_attempts WHERE login_token = $1`,
-          [loginToken]
-        );
-        const attempt = rows[0];
-        console.log(`login_ lookup for token ${loginToken}: ${attempt ? 'found' : 'NOT FOUND'}`);
-
-        let replyText;
-        if (!attempt) {
-          replyText = "This login link isn't valid — go back to the site and try logging in again.";
-        } else if (attempt.confirmed_at) {
-          replyText = "This login link was already used. Go back to the site and start a fresh login if you need one.";
-        } else if (new Date(attempt.expires_at) < new Date()) {
-          replyText = "This login link expired — go back to the site and try again.";
-        } else {
-          const sessionToken = crypto.randomBytes(32).toString('hex');
-          // IMPORTANT: expires_at up to now was still the short 10-minute
-          // signup window — must be pushed out to a real session lifetime
-          // here, or /me would immediately see this session as "expired"
-          // the moment expiry is actually enforced there.
-          const sessionExpiresAt = new Date(Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
-
-          await pool.query(
-            `UPDATE login_attempts
-             SET confirmed_at = now(), session_token = $1, expires_at = $2
-             WHERE id = $3`,
-            [sessionToken, sessionExpiresAt, attempt.id]
-          );
-          await pool.query(
-            `INSERT INTO customers (full_name, phone, telegram_chat_id, password_hash)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (phone) DO UPDATE SET
-               telegram_chat_id = EXCLUDED.telegram_chat_id,
-               password_hash = EXCLUDED.password_hash`,
-            [attempt.full_name || telegramFirstName, attempt.phone, chatId, attempt.password_hash]
-          );
-          console.log(`Login confirmed for phone ${attempt.phone}`);
-          replyText = "You're logged in! Head back to the site — it should update automatically within a few seconds.";
-        }
-
-        const sendResult = await sendTelegramMessage(chatId, replyText);
-        console.log('Telegram sendMessage result:', JSON.stringify(sendResult));
+    const reference = event?.eventData?.paymentReference;
+    if (reference) {
+      const verified = await verifyTransaction(reference);
+      if (verified?.paymentStatus === 'PAID') {
+        await confirmPaymentByReference(reference, verified);
       } else {
-        console.log('Telegram /start payload matched neither connect_ nor login_');
-      }
-    } else if (chatId && text) {
-      const adminChatId = process.env.ADMIN_TELEGRAM_CHAT_ID;
-      if (adminChatId) {
-        const { rows } = await pool.query(
-          `SELECT full_name, phone FROM customers WHERE telegram_chat_id = $1`,
-          [chatId]
+        await pool.query(
+          `UPDATE orders SET status = 'payment_failed', updated_at = now()
+           WHERE paystack_reference = $1 AND status = 'pending_payment'`,
+          [reference]
         );
-        const customer = rows[0];
-        const fromLabel = customer
-          ? `${customer.full_name} (${customer.phone})`
-          : `Unknown Telegram user (chat ${chatId})`;
-        const forwarded = await sendTelegramMessage(adminChatId, `Message from ${fromLabel}:\n${text}`);
-        console.log('Forwarded customer message to admin:', JSON.stringify(forwarded));
-      } else {
-        console.log('ADMIN_TELEGRAM_CHAT_ID not set — customer message not forwarded');
       }
     }
 
     res.sendStatus(200);
   } catch (err) {
-    console.error('Telegram webhook error:', err);
+    console.error('Webhook error:', err);
     res.sendStatus(200);
   }
 });

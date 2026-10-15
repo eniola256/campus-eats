@@ -3,6 +3,7 @@ const pool = require('../db/pool');
 const { calculateFees, MIN_ORDER_KOBO } = require('../services/fees');
 const { initializeTransaction } = require('../services/monnify');
 const { notify } = require('../services/telegram');
+const { getStoreStatus } = require('../services/storeStatus');
 const { requireCustomer } = require('../middleware/customerAuth');
 
 const router = express.Router();
@@ -10,6 +11,21 @@ const router = express.Router();
 function generateReference() {
   return `CE-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
 }
+
+// Fee preview for the cart. Uses the same calculateFees() as order creation,
+// so the cart total always matches what the customer is charged. Must be
+// declared before '/:id' or Express would treat "quote" as an order id.
+router.get('/quote', async (req, res, next) => {
+  try {
+    const subtotalKobo = parseInt(req.query.subtotal, 10);
+    if (!Number.isFinite(subtotalKobo) || subtotalKobo <= 0) {
+      return res.status(400).json({ error: 'subtotal query param required' });
+    }
+    res.json(await calculateFees(subtotalKobo));
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.post('/', async (req, res, next) => {
   const client = await pool.connect();
@@ -20,6 +36,13 @@ router.post('/', async (req, res, next) => {
     }
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'Cart is empty' });
+    }
+
+    // Checked here on the server, so a closed store can't be bypassed by an
+    // old tab or a direct API call. Orders already paid for are unaffected.
+    const store = await getStoreStatus();
+    if (!store.open) {
+      return res.status(400).json({ error: store.message });
     }
 
     await client.query('BEGIN');
@@ -71,17 +94,27 @@ router.post('/', async (req, res, next) => {
     }
     const shopId = shopIds.size === 1 ? [...shopIds][0] : null;
 
-    const { serviceFeeKobo, deliveryFeeKobo } = await calculateFees(subtotalKobo);
-    const totalKobo = subtotalKobo + serviceFeeKobo + deliveryFeeKobo;
+    // A shop switched off in the admin screen can't take orders, even from
+    // a cart that was filled before it was hidden.
+    if (shopId != null) {
+      const { rows: shopRows } = await client.query(`SELECT is_active FROM shops WHERE id = $1`, [shopId]);
+      if (!shopRows[0]?.is_active) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'This shop is currently closed.' });
+      }
+    }
+
+    const { serviceFeeKobo, deliveryFeeKobo, takeawayFeeKobo } = await calculateFees(subtotalKobo);
+    const totalKobo = subtotalKobo + serviceFeeKobo + deliveryFeeKobo + takeawayFeeKobo;
     const reference = generateReference();
 
     const orderResult = await client.query(
       `INSERT INTO orders
-        (customer_id, status, subtotal_kobo, service_fee_kobo, delivery_fee_kobo,
+        (customer_id, status, subtotal_kobo, service_fee_kobo, delivery_fee_kobo, takeaway_fee_kobo,
          total_kobo, delivery_hostel, delivery_note, paystack_reference, shop_id)
-       VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7, $8, $9)
+       VALUES ($1, 'pending_payment', $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING id`,
-      [customerId, subtotalKobo, serviceFeeKobo, deliveryFeeKobo, totalKobo,
+      [customerId, subtotalKobo, serviceFeeKobo, deliveryFeeKobo, takeawayFeeKobo, totalKobo,
        customer.hostel, customer.roomOrGate || null, reference, shopId]
     );
     const orderId = orderResult.rows[0].id;

@@ -15,6 +15,8 @@ const NEXT_LABEL = {
   out_for_delivery: 'Mark delivered',
 };
 const ACTIVE_STATUSES = ['payment_confirmed', 'accepted', 'shopping', 'out_for_delivery'];
+// Must match CANCELLABLE in backend admin.js
+const CANCELLABLE_STATUSES = ['payment_confirmed', 'accepted', 'shopping'];
 
 function minutesAgo(isoString) {
   const diffMs = Date.now() - new Date(isoString).getTime();
@@ -25,13 +27,18 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const token = sessionStorage.getItem('ce_admin_token');
   const [orders, setOrders] = useState([]);
+  const [pendingRefunds, setPendingRefunds] = useState([]);
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState(null);
 
   const refresh = useCallback(async () => {
     try {
-      const all = await Promise.all(ACTIVE_STATUSES.map((s) => api.adminGetOrders(token, s)));
-      setOrders(all.flat().sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
+      const [orderLists, refunds] = await Promise.all([
+        Promise.all(ACTIVE_STATUSES.map((s) => api.adminGetOrders(token, s))),
+        api.adminGetRefunds(token, 'pending'),
+      ]);
+      setOrders(orderLists.flat().sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
+      setPendingRefunds(refunds);
     } catch (err) {
       setError(err.message);
     }
@@ -57,6 +64,20 @@ export default function AdminDashboard() {
     if (selected?.order.id === order.id) openOrder(order.id);
   }
 
+  async function cancelOrder(order) {
+    const ok = window.confirm(
+      `Cancel order #${order.id}? The customer will be owed a refund of ${formatNaira(order.total_kobo)}.`
+    );
+    if (!ok) return;
+    try {
+      await api.adminCancelOrder(token, order.id);
+      await refresh();
+      openOrder(order.id); // keep it open so the refund owed shows right away
+    } catch (err) {
+      window.alert(err.message);
+    }
+  }
+
   async function contactCustomer(itemId, orderId) {
     await api.adminContactCustomer(token, itemId);
     openOrder(orderId);
@@ -70,7 +91,8 @@ export default function AdminDashboard() {
 
   async function markRefunded(refundId, orderId) {
     await api.adminMarkRefunded(token, refundId);
-    openOrder(orderId);
+    await refresh();
+    if (selected?.order.id === orderId) openOrder(orderId);
   }
 
   function logout() {
@@ -84,8 +106,29 @@ export default function AdminDashboard() {
     <div className="admin-dashboard">
       <div className="admin-topbar">
         <h1>Orders</h1>
-        <button className="btn-secondary" onClick={logout}>Log out</button>
+        <div className="admin-topbar-actions">
+          <button className="btn-secondary" onClick={() => navigate('/admin/menu')}>Menu &amp; shops</button>
+          <button className="btn-secondary" onClick={logout}>Log out</button>
+        </div>
       </div>
+
+      {pendingRefunds.length > 0 && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h3 style={{ fontSize: '0.9rem' }}>Refunds owed</h3>
+          <ul className="ticket-items">
+            {pendingRefunds.map((r) => (
+              <li key={r.id} style={{ flexWrap: 'wrap' }}>
+                <span>
+                  #{r.order_number} · {r.full_name} · {r.phone} — {formatNaira(r.amount_kobo)} ({r.reason.replace(/_/g, ' ')})
+                </span>
+                <button className="btn-link" onClick={() => markRefunded(r.id, r.order_id)}>
+                  mark refunded
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="admin-layout">
         <ul className="order-queue">
@@ -94,8 +137,8 @@ export default function AdminDashboard() {
             <li key={o.id} className={`queue-row ${selected?.order.id === o.id ? 'active' : ''}`} onClick={() => openOrder(o.id)}>
               <div>
                 <strong>#{o.id} · {o.full_name}</strong>
-                  <p className="queue-meta" style={{ fontWeight: 700 }}>Buy from: {o.shop_name || 'Unknown shop'}</p>
-                  <p className="queue-meta">{o.hostel || o.delivery_hostel} · {o.phone}</p>
+                <p className="queue-meta" style={{ fontWeight: 700 }}>Buy from: {o.shop_name || 'Unknown shop'}</p>
+                <p className="queue-meta">{o.hostel || o.delivery_hostel} · {o.phone}</p>
               </div>
               <span className={`status-badge status-${o.status}`}>{o.status.replace(/_/g, ' ')}</span>
             </li>
@@ -108,6 +151,7 @@ export default function AdminDashboard() {
             <p className="queue-meta" style={{ fontWeight: 700 }}>Buy from: {selected.order.shop_name || 'Unknown shop'}</p>
             <p className="queue-meta">{selected.order.full_name} · {selected.order.phone}</p>
             <p className="queue-meta">Deliver to: {selected.order.delivery_hostel} {selected.order.room_or_gate}</p>
+            {selected.order.status === 'cancelled' && <span className="tag">cancelled</span>}
 
             <ul className="ticket-items">
               {selected.items.map((item) => (
@@ -115,13 +159,13 @@ export default function AdminDashboard() {
                   <span>{item.quantity}× {item.product_name}</span>
                   <span>{formatNaira(item.line_total_kobo)}</span>
 
-                  {item.status === 'ok' && !item.contact_attempted_at && (
+                  {item.status === 'ok' && !item.contact_attempted_at && selected.order.status !== 'cancelled' && (
                     <button className="btn-link" onClick={() => contactCustomer(item.id, selected.order.id)}>
                       contact customer
                     </button>
                   )}
 
-                  {item.status === 'ok' && item.contact_attempted_at && (
+                  {item.status === 'ok' && item.contact_attempted_at && selected.order.status !== 'cancelled' && (
                     <>
                       <span className="note" style={{ marginTop: 0 }}>
                         contacted {minutesAgo(item.contact_attempted_at)}m ago
@@ -165,6 +209,16 @@ export default function AdminDashboard() {
             {NEXT_STATUS[selected.order.status] && (
               <button className="btn-primary" style={{ marginTop: '1rem' }} onClick={() => advance(selected.order)}>
                 {NEXT_LABEL[selected.order.status]}
+              </button>
+            )}
+
+            {CANCELLABLE_STATUSES.includes(selected.order.status) && (
+              <button
+                className="btn-secondary btn-danger"
+                style={{ marginTop: '0.75rem', marginLeft: NEXT_STATUS[selected.order.status] ? '0.5rem' : 0 }}
+                onClick={() => cancelOrder(selected.order)}
+              >
+                Cancel order
               </button>
             )}
           </div>

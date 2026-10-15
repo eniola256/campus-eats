@@ -1,9 +1,11 @@
 const pool = require('../db/pool');
 
-// Given a subtotal in kobo, return { serviceFeeKobo, deliveryFeeKobo } from
-// the active fee_rules table. Falls back to the top tier if nothing matches
+// Given a subtotal in kobo, return { serviceFeeKobo, deliveryFeeKobo,
+// takeawayFeeKobo } from the active fee_rules table (service + delivery)
+// plus the flat takeaway fee. Falls back to the top tier if nothing matches
 // (e.g. a very large order) and throws if the order is below the minimum.
 const MIN_ORDER_KOBO = 150000; // ₦1,500
+const TAKEAWAY_FEE_KOBO = 20000; // ₦200, flat per order, always charged
 
 async function calculateFees(subtotalKobo) {
   if (subtotalKobo < MIN_ORDER_KOBO) {
@@ -33,13 +35,15 @@ async function calculateFees(subtotalKobo) {
     return {
       serviceFeeKobo: fallback.rows[0]?.service_fee_kobo ?? 25000,
       deliveryFeeKobo: fallback.rows[0]?.delivery_fee_kobo ?? 30000,
+      takeawayFeeKobo: TAKEAWAY_FEE_KOBO,
     };
   }
 
   return {
     serviceFeeKobo: rows[0].service_fee_kobo,
     deliveryFeeKobo: rows[0].delivery_fee_kobo,
+    takeawayFeeKobo: TAKEAWAY_FEE_KOBO,
   };
 }
 
-module.exports = { calculateFees, MIN_ORDER_KOBO };
+module.exports = { calculateFees, MIN_ORDER_KOBO, TAKEAWAY_FEE_KOBO };
