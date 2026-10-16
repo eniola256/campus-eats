@@ -48,8 +48,11 @@ export default function Navbar() {
               Sign in
             </Link>
           ) : (
-            <button className="nav-pill" onClick={logout}>
-              Log out
+            <button className="nav-pill" onClick={logout} aria-label="Log out">
+              <span className="logout-label">Log out</span>
+              <span className="material-symbols-outlined logout-icon" aria-hidden="true">
+                logout
+              </span>
             </button>
           )}
         </div>

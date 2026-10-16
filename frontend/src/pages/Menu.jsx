@@ -141,9 +141,11 @@ export default function Menu() {
                       <div className="product-image-placeholder">🍽️</div>
                     )}
                     <div className="product-info">
-                      <h3>{p.name}</h3>
+                      <div className="product-title-price">
+                        <h3>{p.name}</h3>
+                        <span className="price">{formatNaira(p.price_kobo)}</span>
+                      </div>
                       {p.description && <p className="product-desc">{p.description}</p>}
-                      <span className="price">{formatNaira(p.price_kobo)}</span>
                     </div>
                     <div className="product-actions">
                       <ProductQty product={p} shopName={selectedShop.name} />

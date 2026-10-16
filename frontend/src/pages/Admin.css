@@ -34,6 +34,7 @@
 .admin-section-title { font-size: 1.1rem; margin: 1.75rem 0 0.75rem; }
 
 .admin-card { background: #fff; border: 1.5px solid var(--admin-line); border-radius: var(--admin-radius); padding: 1rem; margin-bottom: 1rem; }
+.admin-card:hover { border-color: var(--accent); }
 .admin-card.inactive { opacity: 0.7; }
 .admin-card-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; }
 .admin-card-head strong { flex: 1; }
@@ -59,7 +60,7 @@
 
 .admin-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; }
 .admin-tab { background: #fff; color: var(--primary); border: 2px solid var(--primary); border-radius: var(--admin-radius); padding: 0.5rem 1rem; font-weight: 600; font-family: inherit; cursor: pointer; }
-.admin-tab.active { background: var(--primary); color: #fff; }
+.admin-tab.active { background: var(--primary); color: #fff; border-color: var(--accent); }
 .admin-shop-picker { max-width: 320px; font-size: 0.85rem; }
 
 /* Status badges (admin screens) */

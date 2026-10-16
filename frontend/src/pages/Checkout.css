@@ -6,6 +6,8 @@
 
 .checkout-page h1 {
   margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid var(--accent);
 }
 
 /* --- Cart items: soft floating rows instead of a plain divided list --- */
@@ -24,11 +26,16 @@
   justify-content: space-between;
   gap: 1rem;
   background: white;
+  border-left: 3px solid transparent;
   border-radius: 16px;
   padding: 0.85rem 1.1rem;
   box-shadow:
     0 1px 2px rgba(0, 0, 0, 0.04),
     0 6px 16px rgba(0, 0, 0, 0.05);
+}
+
+.cart-row:hover {
+  border-left-color: var(--accent);
 }
 
 .cart-name {
@@ -72,6 +79,7 @@
 /* --- Totals: a soft light card instead of a solid dark block --- */
 .totals {
   background: white;
+  border-top: 3px solid var(--accent);
   border-radius: 18px;
   padding: 1.1rem 1.3rem;
   margin-bottom: 2rem;
@@ -120,8 +128,8 @@
 
 .checkout-form input:focus {
   outline: none;
-  border-color: var(--primary, var(--teal));
-  box-shadow: 0 0 0 3px rgba(23, 107, 58, 0.12);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .checkout-form button[type="submit"] {

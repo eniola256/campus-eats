@@ -2,9 +2,19 @@
   --background:   #FFF8E8;
   --primary   :    #176B3A;
   --accent   :   #F4B400;
+  --accent-soft: #fff1c2;
+  --accent-deep: #8a6200;
   --secondary:   #2E8B57;
   --text:     #182015;
   --error:    #c1432e;
+  --paper: #fff;
+  --charcoal: var(--text);
+  --teal: var(--primary);
+  --mustard: var(--accent);
+  --mustard-deep: var(--accent-deep);
+  --line: #e4dcc6;
+  --red: var(--error);
+  --radius: 12px;
 }
 
 p{
@@ -28,12 +38,21 @@ a{
 .state-msg.error { color: var(--red); font-weight: 600; }
 
 .btn-primary {
-  background: var(--teal); color: var(--paper); border: none; border-radius: var(--radius);
+  background: var(--primary); color: var(--paper); border: none; border-radius: var(--radius);
   padding: 0.85rem; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 0.5rem;
 }
+.btn-primary:hover:not(:disabled) { box-shadow: 0 0 0 3px var(--accent-soft); }
 .btn-primary:disabled { opacity: 0.6; cursor: default; }
 .btn-secondary { background: transparent; border: 2px solid var(--charcoal); border-radius: var(--radius); padding: 0.5rem 1rem; cursor: pointer; font-weight: 600; }
 .btn-link { background: none; border: none; color: var(--red); text-decoration: underline; cursor: pointer; font-size: 0.8rem; font-family: 'Space Grotesk', sans-serif; }
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* Order tracking — receipt/ticket signature element */
 .tracking-page { display: flex; justify-content: center; padding: 2rem 0; }
@@ -64,6 +83,6 @@ a{
 /* Order rows (shared: My orders page and the admin queue).
    The admin-only layout rules now live in pages/Admin.css. */
 .queue-row { border: 2px solid var(--charcoal); border-radius: var(--radius); padding: 0.75rem 1rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; background: white; }
-.queue-row.active { background: var(--mustard); }
+.queue-row.active { background: var(--accent-soft); }
 .queue-meta { font-size: 0.75rem; color: #6b6255; margin: 0.2rem 0 0; }
 .status-badge { font-size: 0.7rem; text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 999px; background: var(--teal); color: white; white-space: nowrap; }

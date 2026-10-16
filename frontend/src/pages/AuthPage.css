@@ -25,6 +25,12 @@
   font-size: 1rem;
 }
 
+.auth-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 .auth-form button[type="submit"] {
   margin-top: 0.25rem;
 }
